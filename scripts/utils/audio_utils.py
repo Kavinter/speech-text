@@ -1,4 +1,4 @@
-import os
+import os, sys
 import ffmpeg
 from pathlib import Path
 
@@ -50,8 +50,12 @@ def convert_to_wav_16k_mono(input_path: str, output_dir: str) -> str:
     return output_path
 
 
-input_file = input("Unesi putanju do audio fajla: ").strip()
-output_folder = input("Unesi folder gde ce se sacuvati konvertovani fajl: ").strip()
+if len(sys.argv) >= 3:
+    input_file = sys.argv[1]
+    output_folder = sys.argv[2]
+else:
+    input_file = input("Unesi putanju do audio fajla: ").strip()
+    output_folder = input("Unesi folder gde ce se sacuvati konvertovani fajl: ").strip()
 
 if not validate_audio_format(input_file):
     print(f"Nevalidan audio fajl ili fajl ne postoji: {input_file}")
