@@ -6,22 +6,21 @@ from pathlib import Path
 SUPPORTED_AUDIO_FORMATS = {".mp3", ".mp4", ".m4a", ".wav", ".ogg", ".webm"}
 
 def validate_audio_format(file_path: str) -> bool:
+    p = Path(file_path)
 
-    if not file_path:
-        return False
-    
-    if not os.path.isfile(file_path):
-        return False
+    return p.is_file() and p.suffix.lower() in SUPPORTED_AUDIO_FORMATS
 
-    name, ext = os.path.splitext(file_path)
-    ext = ext.lower()
+def convert_to_wav_16k_mono(input_path: str, output_dir: str, verbose: bool = False) -> str:
 
-    return ext in SUPPORTED_AUDIO_FORMATS
+    input_path = Path(input_path)
 
-def convert_to_wav_16k_mono(input_path: str, output_dir: str) -> str:
-
-    if not isinstance(input_path, str) or not os.path.isfile(input_path):
+    if not input_path.is_file():
         raise FileNotFoundError(f"Ulazni fajl ne postoji ili nije citljiv: {input_path}")
+
+    if input_path.suffix.lower() == ".wav" and input_path.stem.endswith("_16k_mono"):
+        if verbose:
+            print(f"Preskacem konverziju (vec 16k mono): {input_path}")
+        return str(input_path)
     
     if not isinstance(output_dir, str) or not output_dir.strip():
         raise ValueError("Morate zadati validan output folder")
@@ -50,24 +49,20 @@ def convert_to_wav_16k_mono(input_path: str, output_dir: str) -> str:
     return output_path
 
 
-if len(sys.argv) >= 3:
-    input_file = sys.argv[1]
-    output_folder = sys.argv[2]
-else:
-    input_file = input("Unesi putanju do audio fajla: ").strip()
-    output_folder = input("Unesi folder gde ce se sacuvati konvertovani fajl: ").strip()
+if __name__ == "__main__":
+    if len(sys.argv) >= 3:
+        input_file = sys.argv[1]
+        output_folder = sys.argv[2]
+    else:
+        input_file = input("Unesi putanju do audio fajla: ").strip()
+        output_folder = input("Unesi folder: ").strip()
 
-if not validate_audio_format(input_file):
-    print(f"Nevalidan audio fajl ili fajl ne postoji: {input_file}")
-else:
+    if not validate_audio_format(input_file):
+        print(f"Nevalidan audio fajl: {input_file}")
+        sys.exit(1)
+
     try:
         wav_file = convert_to_wav_16k_mono(input_file, output_folder)
-        print(f"Konvertovani fajl uspesno kreiran: {wav_file}")
-
-        if os.path.isfile(wav_file):
-            print("Fajl postoji i konverzija je uspesna")
-        else:
-            print("Greska: konvertovani fajl nije kreiran")
-
+        print(f"Konvertovani fajl: {wav_file}")
     except Exception as e:
         print(f"Greska pri konverziji: {e}")
