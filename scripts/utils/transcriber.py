@@ -60,7 +60,7 @@ def format_segments(segments: List[TranscriptSegment]) -> str:
     return "\n".join(lines)
 
 def main():
-    parser = argparse.ArgumentParser(description="Audio → Tekst transkripcija")
+    parser = argparse.ArgumentParser(description="Speech to Text Transcription")
     parser.add_argument("audio_file", help="Putanja do audio fajla")
     parser.add_argument("-o", "--output", help="Izlazni fajl (default: stdout)")
     parser.add_argument("-m", "--model", default="large", help="Whisper model (default: large)")
