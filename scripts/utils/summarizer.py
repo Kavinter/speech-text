@@ -1,6 +1,7 @@
 from pathlib import Path
 import requests
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+from pydantic import BaseModel, Field, ValidationError
 
 SRBGLISH_TERMS: Dict[str, str] = {}
 
@@ -80,6 +81,46 @@ def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] =
             if append_mode:
                 with open(output_file, "a", encoding="utf-8") as f:
                     f.write(chunk_text_to_send + "\n")
+
+# Pydantic modeli zapisnika
+
+class ActionItem(BaseModel):
+    task: str
+    assignee: str
+    deadline: str
+
+class Decision(BaseModel):
+    decision: str
+    rationale: str
+
+class TopicDiscussion(BaseModel):
+    topic: str
+    context: str
+    key_arguments: List[str]
+    conclusion: str
+
+class MeetingMinutes(BaseModel):
+    executive_summary: str
+    topics: List[str]
+    decisions: List[Decision]
+    action_items: List[ActionItem]
+    discussions: List[TopicDiscussion]
+
+    def to_json(self) -> str:
+        return self.model_dump_json(indent=2)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "MeetingMinutes":
+        return cls.model_validate_json(json_str)
+    
+def parse_meeting_minutes(llm_json: str) -> MeetingMinutes:
+    try:
+        return MeetingMinutes.from_json(llm_json)
+    except ValidationError as e:
+        print("Nevalidan zapisnik sa sastanka.")
+        raise
+
+# MAIN BLOCK
 
 if __name__ == "__main__":
     import sys
