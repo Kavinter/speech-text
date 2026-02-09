@@ -1,0 +1,11 @@
+Iz sledećeg dela transkripta izdvoj:
+
+- ključne teme
+- donete odluke (ako postoje)
+- akcione zadatke (ako postoje)
+- važne diskusije i argumente
+
+Ignoriši sve vremenske oznake u formatu [hh:mm:ss - hh:mm:ss].
+
+Odgovori u čistom tekstu, u kratkim stavkama.
+Ne koristi JSON.
