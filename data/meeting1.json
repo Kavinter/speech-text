@@ -1,0 +1,41 @@
+{
+  "executive_summary": "Sastanak je obuhvatio planove za naredni kvartal i definisane zadatke za tim.",
+  "topics": ["Plan rada", "Budžet", "Tim resursi"],
+  "decisions": [
+    {
+      "decision": "Odobren budžet za marketing kampanju",
+      "justification": "Potrebno povećati vidljivost proizvoda"
+    },
+    {
+      "decision": "Određen tim za razvoj nove funkcionalnosti",
+      "justification": "Rok je kratak i potrebna je specijalizovana grupa"
+    }
+  ],
+  "action_items": [
+    {
+      "task": "Pripremiti plan kampanje",
+      "assigned_to": "Marko",
+      "deadline": "2026-02-20"
+    },
+    {
+      "task": "Napravi prototip nove funkcionalnosti",
+      "assigned_to": "Jovana",
+      "deadline": "2026-02-25"
+    }
+  ],
+  "discussions": [
+    {
+      "topic": "Plan rada",
+      "context": "Razmatrali smo prioritete za naredni kvartal",
+      "key_arguments": ["Marketing je prioritet", "Razvoj novih funkcionalnosti"],
+      "conclusion": "Marketing kampanja će biti sprovedena u martu"
+    },
+    {
+      "topic": "Budžet",
+      "context": "Pregled finansijskih sredstava",
+      "key_arguments": ["Postoji limit budžeta", "Potreban dodatni kapital za marketing"],
+      "conclusion": "Odobren dodatni budžet za kampanju"
+    }
+  ]
+}
+

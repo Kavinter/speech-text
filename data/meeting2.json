@@ -1,0 +1,51 @@
+{
+  "executive_summary": "Sastanak je fokusiran na marketing strategiju i razvoj novog proizvoda.",
+  "topics": [
+    "Marketing strategija",
+    "Razvoj proizvoda",
+    "Raspodela zadataka"
+  ],
+  "decisions": [
+    {
+      "decision": "Odobren budžet za marketing",
+      "rationale": "Kako bi se povećala vidljivost proizvoda"
+    },
+    {
+      "decision": "Formirana nova timska grupa za razvoj proizvoda",
+      "rationale": "Za fokus na implementaciju novih funkcionalnosti"
+    }
+  ],
+  "action_items": [
+    {
+      "task": "Pripremiti plan marketinške kampanje",
+      "assignee": "Marko",
+      "deadline": "2026-02-20"
+    },
+    {
+      "task": "Napravi prototip novog proizvoda",
+      "assignee": "Jovana",
+      "deadline": "2026-02-25"
+    }
+  ],
+  "discussions": [
+    {
+      "topic": "Marketing strategija",
+      "context": "Diskusija o ciljnim tržištima i kanalima promocije",
+      "key_arguments": [
+        "Povećati budžet za digitalni marketing",
+        "Fokusirati se na socijalne mreže"
+      ],
+      "conclusion": "Odlučeno je da se budžet poveća i angažuje dodatna agencija za digital marketing"
+    },
+    {
+      "topic": "Razvoj proizvoda",
+      "context": "Razmatranje novih funkcionalnosti i prioriteta",
+      "key_arguments": [
+        "Prioritet su funkcionalnosti koje povećavaju UX",
+        "Nove funkcionalnosti moraju biti spremne do Q2"
+      ],
+      "conclusion": "Formirana timska grupa za implementaciju funkcionalnosti do kraja kvartala"
+    }
+  ]
+}
+

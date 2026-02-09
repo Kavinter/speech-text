@@ -1,0 +1,54 @@
+root ::= "{" ws
+          "\"executive_summary\"" ":" ws string "," ws
+          "\"topics\"" ":" ws string_array "," ws
+          "\"decisions\"" ":" ws decisions_array "," ws
+          "\"action_items\"" ":" ws action_items_array "," ws
+          "\"discussions\"" ":" ws discussions_array
+          "}" ws
+
+# ---------- primitives ----------
+
+ws ::= ( " " | "\n" | "\t" )*
+
+string ::= "\"" string_char* "\""
+
+string_char ::= [^"\\\x00-\x1F] | "\\" ["\\/bfnrt]
+
+digit ::= [0-9]
+
+date ::= "\"" digit digit digit digit "-" digit digit "-" digit digit "\""
+
+# ---------- arrays ----------
+
+string_array ::= "[" ws string (ws "," ws string)* ws "]"
+
+# ---------- decisions ----------
+
+decisions_array ::= "[" ws decision_item (ws "," ws decision_item)* ws "]"
+
+decision_item ::= "{" ws
+                   "\"decision\"" ":" ws string "," ws
+                   "\"rationale\"" ":" ws string
+                   "}" ws
+
+# ---------- action items ----------
+
+action_items_array ::= "[" ws action_item (ws "," ws action_item)* ws "]"
+
+action_item ::= "{" ws
+                "\"task\"" ":" ws string "," ws
+                "\"assignee\"" ":" ws string "," ws
+                "\"deadline\"" ":" ws date
+                "}" ws
+
+# ---------- discussions ----------
+
+discussions_array ::= "[" ws discussion_item (ws "," ws discussion_item)* ws "]"
+
+discussion_item ::= "{" ws
+                    "\"topic\"" ":" ws string "," ws
+                    "\"context\"" ":" ws string "," ws
+                    "\"key_arguments\"" ":" ws string_array "," ws
+                    "\"conclusion\"" ":" ws string
+                    "}" ws
+
