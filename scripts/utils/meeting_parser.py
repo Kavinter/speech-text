@@ -1,7 +1,5 @@
 import requests
 from pathlib import Path
-import json
-from jsonschema import validate, ValidationError
 from summarizer import parse_meeting_minutes, MeetingMinutes
 
 LM_API_URL = "http://localhost:1234/v1/chat/completions"
@@ -123,6 +121,26 @@ def generate_meeting_minutes_from_file(file_path: Path, lm_api_url: str = LM_API
     meeting_minutes = parse_meeting_minutes(llm_json)
     return meeting_minutes
 
+# Funkcija za kreiranje MeetingMinutes iz LLM JSON-a direktno
+def generate_meeting_minutes_from_json(llm_json: str) -> MeetingMinutes:
+    meeting_minutes = parse_meeting_minutes(llm_json)
+    print("MeetingMinutes objekat kreiran iz JSON-a.\n")
+    print("--- Executive Summary ---")
+    print(meeting_minutes.executive_summary)
+    print("\n--- Topics ---")
+    for t in meeting_minutes.topics:
+        print(f"- {t}")
+    print("\n--- Decisions ---")
+    for d in meeting_minutes.decisions:
+        print(f"- {d.decision}: {d.rationale}")
+    print("\n--- Action Items ---")
+    for a in meeting_minutes.action_items:
+        print(f"- {a.task} (assignee: {a.assignee}, deadline: {a.deadline})")
+    print("\n--- Discussions ---")
+    for disc in meeting_minutes.discussions:
+        print(f"- {disc.topic}\n  Context: {disc.context}\n  Key arguments: {', '.join(disc.key_arguments)}\n  Conclusion: {disc.conclusion}\n")
+    return meeting_minutes
+
 # CLI
 if __name__ == "__main__":
     import sys
@@ -139,12 +157,21 @@ if __name__ == "__main__":
 
         output_folder = Path("output")
         output_folder.mkdir(exist_ok=True)
-
         output_file = output_folder / (input_file.stem + ".json")
+
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(json_output)
 
         print(f"\nJSON fajl je snimljen u: {output_file}")
+
+        with open(output_file, "r", encoding="utf-8") as f:
+            loaded_json = f.read()
+
+        loaded_minutes = parse_meeting_minutes(loaded_json)
+
+        print("\nZapisnik sa sastanka (iz JSON fajla):\n")
+        generate_meeting_minutes_from_json(loaded_minutes.to_json())
+
 
     except Exception as e:
         print(f"Došlo je do greške: {e}")
