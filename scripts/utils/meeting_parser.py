@@ -9,7 +9,7 @@ GRAMMAR = GRAMMAR_PATH.read_text(encoding="utf-8")
 
 CHAT_MODEL = "meta-llama-3.1-8b-instruct"
 
-# Chunkovanje transkripta po max_chars
+# Split transcript into chunks by max character length
 def chunk_text(text: str, max_chars: int = 500):
     chunks = []
     start = 0
@@ -18,7 +18,7 @@ def chunk_text(text: str, max_chars: int = 500):
         start += max_chars
     return chunks
 
-# Obrada jednog chunk-a
+# Process a single transcript chunk
 def process_chunk(chunk: str, chunk_prompt: str) -> str:
 
     payload = {
@@ -35,7 +35,7 @@ def process_chunk(chunk: str, chunk_prompt: str) -> str:
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"].strip()
 
-# Generisanje zapisnika sa sastanka iz fajla
+# Generate meeting minutes from a transcript file
 def generate_meeting_minutes_from_file(file_path: Path, system_prompt: str, chunk_prompt: str, lm_api_url: str = LM_API_URL) -> MeetingMinutes:
     if not file_path.is_file():
         raise FileNotFoundError(f"Fajl ne postoji: {file_path}")
@@ -43,17 +43,17 @@ def generate_meeting_minutes_from_file(file_path: Path, system_prompt: str, chun
     with open(file_path, "r", encoding="utf-8") as f:
         transcript_text = f.read()
 
-    # Chunkovanje
+    # Chunk the transcript
     chunks = chunk_text(transcript_text)
     partial_summaries = []
     for i, chunk in enumerate(chunks):
         print(f"Processing chunk {i+1}/{len(chunks)}")
         partial_summaries.append(process_chunk(chunk, chunk_prompt))
 
-    # Kombinovanje chunk rezultata
+    # Combine chunk-level summaries
     combined_summary = "\n\n".join(partial_summaries)
 
-    # Finalni JSON poziv
+    # Final LLM call to generate structured JSON
     payload = {
       "model": CHAT_MODEL,
       "messages": [
@@ -61,10 +61,10 @@ def generate_meeting_minutes_from_file(file_path: Path, system_prompt: str, chun
           {
               "role": "user",
               "content": (
-                  "Na osnovu sledećih sažetih informacija sa sastanka, "
-                  "generiši kompletan zapisnik sa sastanka u JSON formatu.\n\n"
-                  f"{combined_summary}"
-              )
+                    "Based on the following summarized meeting information, "
+                    "generate a complete meeting minutes document in JSON format.\n\n"
+                    f"{combined_summary}"
+                )
           }
       ],
       "grammar": GRAMMAR,
@@ -78,33 +78,38 @@ def generate_meeting_minutes_from_file(file_path: Path, system_prompt: str, chun
         data = resp.json()
         llm_json = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
     except requests.exceptions.RequestException as e:
-        print(f"Greška pri komunikaciji sa LLM: {e}")
+        print(f"Error communicating with LLM: {e}")
         raise
 
-    # Pretvaranje u MeetingMinutes
+    # Parse JSON into MeetingMinutes object
     meeting_minutes = parse_meeting_minutes(llm_json)
     return meeting_minutes
 
 
-# Funkcija za kreiranje MeetingMinutes iz LLM JSON-a direktno
-def generate_meeting_minutes_from_json(llm_json: str) -> MeetingMinutes:
-    meeting_minutes = parse_meeting_minutes(llm_json)
-    print("MeetingMinutes objekat kreiran iz JSON-a.\n")
+def print_meeting_minutes(minutes: MeetingMinutes) -> None:
     print("--- Executive Summary ---")
-    print(meeting_minutes.executive_summary)
+    print(minutes.executive_summary)
+
     print("\n--- Topics ---")
-    for t in meeting_minutes.topics:
+    for t in minutes.topics:
         print(f"- {t}")
+
     print("\n--- Decisions ---")
-    for d in meeting_minutes.decisions:
+    for d in minutes.decisions:
         print(f"- {d.decision}: {d.rationale}")
+
     print("\n--- Action Items ---")
-    for a in meeting_minutes.action_items:
+    for a in minutes.action_items:
         print(f"- {a.task} (assignee: {a.assignee}, deadline: {a.deadline})")
+
     print("\n--- Discussions ---")
-    for disc in meeting_minutes.discussions:
-        print(f"- {disc.topic}\n  Context: {disc.context}\n  Key arguments: {', '.join(disc.key_arguments)}\n  Conclusion: {disc.conclusion}\n")
-    return meeting_minutes
+    for disc in minutes.discussions:
+        print(
+            f"- {disc.topic}\n"
+            f"  Context: {disc.context}\n"
+            f"  Key arguments: {', '.join(disc.key_arguments)}\n"
+            f"  Conclusion: {disc.conclusion}\n"
+        )
 
 # CLI
 if __name__ == "__main__":
@@ -132,16 +137,15 @@ if __name__ == "__main__":
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(json_output)
 
-        print(f"\nJSON fajl je snimljen u: {output_file}")
+        print(f"\nJSON file saved to: {output_file}")
 
         with open(output_file, "r", encoding="utf-8") as f:
             loaded_json = f.read()
 
         loaded_minutes = parse_meeting_minutes(loaded_json)
 
-        print("\nZapisnik sa sastanka (iz JSON fajla):\n")
-        generate_meeting_minutes_from_json(loaded_minutes.to_json())
-
+        print("\nMeeting minutes (loaded from JSON file):\n")
+        print_meeting_minutes(loaded_minutes)
 
     except Exception as e:
-        print(f"Došlo je do greške: {e}")
+        print(f"An error occurred: {e}")

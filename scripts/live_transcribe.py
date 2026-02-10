@@ -26,7 +26,7 @@ def record_chunks():
             start_time = time.time()
             while not stop_event.is_set():
                 if pause_event.is_set():
-                    time.sleep(0.1)  # Wait while paused
+                    time.sleep(0.1)
                     continue
 
                 # Read small portion of audio (0.5s)
