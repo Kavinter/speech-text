@@ -25,14 +25,14 @@ class Transcriber:
     def transcribe(self, audio_path: str, prompt: Optional[str] = None, language: Optional[str] = "sr", verbose=False) -> List[TranscriptSegment]:
 
         if verbose:
-            print(f"Pokretanje transkripcije: {audio_path} sa modelom {self.model_size}")
+            print(f"Transcription finished in {time.time() - start_time:.2f}s")
 
         start_time = time.time()
 
         segments: List[TranscriptSegment] = []
 
         # Perform transcription
-        segments_list, info = self.model.transcribe(
+        segments_list, _info = self.model.transcribe(
             audio_path,
             beam_size=5,
             word_timestamps=False,
@@ -51,7 +51,7 @@ class Transcriber:
             )
 
         if verbose:
-            print(f"Transkripcija završena u {time.time() - start_time:.2f}s")
+            print(f"Transcription finished in {time.time() - start_time:.2f}s")
 
 
         return segments
