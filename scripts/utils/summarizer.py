@@ -24,70 +24,7 @@ Your task is to:
 
 LM_API_URL = "http://localhost:1234/v1/chat/completions"
 
-# Yield chunks of text for processing
-def chunk_text(lines, chunk_size=5):
-    for i in range(0, len(lines), chunk_size):
-        yield lines[i:i + chunk_size]
-
-# Main function to clean a transcript
-def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] = None, output_file: Optional[Path] = None):
-    if terms_dict is None:
-        terms_dict = {}
-
-    # Add instructions for term replacements if provided
-    dict_instructions = ""
-    if terms_dict:
-        dict_instructions = "Koristi sledece ispravne termine:\n"
-        for k, v in terms_dict.items():
-            dict_instructions += f"- {k} -> {v}\n"
-
-    lines = raw_text.splitlines()
-
-    append_mode = output_file is not None
-
-    if append_mode:
-        output_file.parent.mkdir(exist_ok=True)
-        output_file.write_text("", encoding="utf-8")
-
-    for chunk_lines in chunk_text(lines, chunk_size=5):
-        chunk_text_to_send = "\n".join(chunk_lines)
-
-        payload = {
-            "model": "google/gemma-3-4b",
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": dict_instructions + "\nIspravi sledeći tekst:\n" + chunk_text_to_send}
-            ],
-            "temperature": 0.0,
-            "max_tokens": 300
-        }
-
-        try:
-            resp = requests.post(LM_API_URL, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            print("DEBUG - LM API response:", data)
-
-            # Extract cleaned text from LM response
-            cleaned_chunk = (
-                data.get("choices", [{}])[0]
-                .get("message", {})
-                .get("content", "")
-                .strip()
-            )
-
-            if append_mode:
-                with open(output_file, "a", encoding="utf-8") as f:
-                    f.write(cleaned_chunk + "\n")
-            else:
-                yield cleaned_chunk
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error processing chunk: {e}")
-            # fallback: write original chunk if LM request fails
-            if append_mode:
-                with open(output_file, "a", encoding="utf-8") as f:
-                    f.write(chunk_text_to_send + "\n")
+CHAT_MODEL = "google/gemma-3-4b"
 
 # Pydantic models for meeting minutes
 class ActionItem(BaseModel):
@@ -125,6 +62,72 @@ def parse_meeting_minutes(llm_json: str) -> MeetingMinutes:
     except ValidationError as e:
         print("Invalid meeting minutes JSON.")
         raise
+
+
+# Yield chunks of text for processing
+def chunk_text(lines, chunk_size=5):
+    for i in range(0, len(lines), chunk_size):
+        yield lines[i:i + chunk_size]
+
+# Main function to clean a transcript
+def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] = None, output_file: Optional[Path] = None):
+    if terms_dict is None:
+        terms_dict = {}
+
+    # Add instructions for term replacements if provided
+    dict_instructions = ""
+    if terms_dict:
+        dict_instructions = "Koristi sledece ispravne termine:\n"
+        for k, v in terms_dict.items():
+            dict_instructions += f"- {k} -> {v}\n"
+
+    lines = raw_text.splitlines()
+
+    append_mode = output_file is not None
+
+    if append_mode:
+        output_file.parent.mkdir(exist_ok=True)
+        output_file.write_text("", encoding="utf-8")
+
+    for chunk_lines in chunk_text(lines, chunk_size=5):
+        chunk_text_to_send = "\n".join(chunk_lines)
+
+        payload = {
+            "model": CHAT_MODEL,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": dict_instructions + "\nIspravi sledeći tekst:\n" + chunk_text_to_send}
+            ],
+            "temperature": 0.0,
+            "max_tokens": 300
+        }
+
+        try:
+            resp = requests.post(LM_API_URL, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            print("DEBUG - LM API response:", data)
+
+            # Extract cleaned text from LM response
+            cleaned_chunk = (
+                data.get("choices", [{}])[0]
+                .get("message", {})
+                .get("content", "")
+                .strip()
+            )
+
+            if append_mode:
+                with open(output_file, "a", encoding="utf-8") as f:
+                    f.write(cleaned_chunk + "\n")
+            else:
+                yield cleaned_chunk
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error processing chunk: {e}")
+            # fallback: write original chunk if LM request fails
+            if append_mode:
+                with open(output_file, "a", encoding="utf-8") as f:
+                    f.write(chunk_text_to_send + "\n")
 
 # MAIN BLOCK
 if __name__ == "__main__":

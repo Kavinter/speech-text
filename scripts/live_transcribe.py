@@ -1,25 +1,31 @@
 import sounddevice as sd
 import numpy as np
 import wave
+import argparse
 import time
 import os
 import tempfile
 from faster_whisper import WhisperModel
 from faster_whisper.vad import get_speech_timestamps, VadOptions
 from queue import Queue
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from dataclasses import dataclass
+from pathlib import Path
+from utils import summarizer, meeting_parser
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
-CHUNK_DURATION = 5
+DEFAULT_CHUNK_DURATION = 5
+CHUNK_DURATION = DEFAULT_CHUNK_DURATION
 CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
 LANGUAGE = "sr"
 
+print_lock = Lock()
 stop_event = Event()
 pause_event = Event()
 audio_queue = Queue()
 full_transcript = []
+all_chunk_files = []
 
 vad_options = VadOptions(
     threshold=0.5,
@@ -38,8 +44,13 @@ class TranscriptSegment:
         start_str = time.strftime("%M:%S", time.gmtime(int(self.start)))
         end_str = time.strftime("%M:%S", time.gmtime(int(self.end)))
         return f"[{start_str} - {end_str}] {self.text}"
+    
+def safe_print(*args, **kwargs):
+    with print_lock:
+        print(*args, **kwargs)
 
-def save_chunk(data: np.ndarray, counter: int):
+
+def save_chunk(data: np.ndarray, counter: int) -> str:
     temp_dir = tempfile.gettempdir()
     filename = os.path.join(temp_dir, f"chunk_{counter}.wav")
 
@@ -49,11 +60,11 @@ def save_chunk(data: np.ndarray, counter: int):
         wf.setframerate(SAMPLE_RATE)
         wf.writeframes(data.tobytes())
 
+    all_chunk_files.append(filename)
+
     return filename
 
-
 def record_chunks():
-    print("Recording started. Press Ctrl+C or 'q' to stop.")
     chunk_buffer = np.empty((0,), dtype=np.int16)
     chunk_counter = 1
     total_samples = 0
@@ -114,10 +125,26 @@ def record_chunks():
                         chunk_counter += 1
 
     except KeyboardInterrupt:
-        print("\nRecording interrupted by user.")
+        safe_print("\nRecording interrupted by user.")
 
-def transcribe_audio():
-    model = WhisperModel("large", device="cpu", compute_type="float32")
+def merge_wav_files(chunk_files, output_path):
+    audio_data = []
+
+    for path in chunk_files:
+        with wave.open(path, 'rb') as wf:
+            frames = wf.readframes(wf.getnframes())
+            audio_data.append(np.frombuffer(frames, dtype=np.int16))
+
+    merged = np.concatenate(audio_data)
+
+    with wave.open(str(output_path), 'wb') as wf:
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(2)
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(merged.tobytes())
+
+def transcribe_audio(whisper_model_name: str):
+    model = WhisperModel(whisper_model_name, device="cpu", compute_type="float32")
 
     while not stop_event.is_set() or not audio_queue.empty():
         try:
@@ -138,34 +165,127 @@ def transcribe_audio():
                 start = chunk_start + segment.start,
                 end = chunk_start + segment.end,
                 text = segment.text.strip()
-
             )
 
-        if segment_obj.text:
-            full_transcript.append(segment_obj)
+            if segment_obj.text:
+                full_transcript.append(segment_obj)
+                safe_print(f"\n{segment_obj.format()}", flush=True)
 
         audio_queue.task_done()
+
+def save_transcript(transcript, path):
+    with open(path, "w", encoding="utf-8") as f:
+        for seg in transcript:
+            f.write(seg.format() + "\n")
+
+def cleanup_chunks(chunk_files):
+    for path in chunk_files:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 def command_listener():
     while not stop_event.is_set():
         try:
-            cmd = input("Enter 'q' to quit, 'p' to pause, 'r' to resume: ").strip().lower()
+            with print_lock:
+                cmd = input("Enter 'q' to quit, 'p' to pause, 'r' to resume: ").strip().lower()
             if cmd == 'q':
+                safe_print("Stopping recording and finishing remaining chunks...")
                 stop_event.set()
             elif cmd == 'p':
-                pause_event.set()
-                print("Recording paused.")
+                if not pause_event.is_set():
+                    pause_event.set()
+                    safe_print("Recording paused.")
+                else:
+                    safe_print("Recording is already paused.")
             elif cmd == 'r':
-                pause_event.clear()
-                print("Recording resumed.")
+                if pause_event.is_set():
+                    pause_event.clear()
+                    safe_print("Recording resumed.")
+                else:
+                    safe_print("Recording is not paused.")
+            else:
+                safe_print("Unknown command. Use 'q', 'p' or 'r'.")
+
         except EOFError:
             break
 
 
 def main():
-    record_thread = Thread(target=record_chunks)
-    transcribe_thread = Thread(target=transcribe_audio)
-    command_thread = Thread(target=command_listener)
+    parser = argparse.ArgumentParser(description="Live audio recording and transcription")
+
+    parser.add_argument(
+        "-o", "--output",
+        help="Path to output WAV file (e.g. output/live.wav)"
+    )
+    parser.add_argument(
+        "--chunk-duration",
+        type=int,
+        default=DEFAULT_CHUNK_DURATION,
+        help="Chunk duration in seconds"
+    )
+    parser.add_argument(
+        "--summarize",
+        action="store_true",
+        help="Run summarization after recording (true/false)"
+    )
+
+    parser.add_argument(
+        "-f", "--format",
+        type=str,
+        choices=["md", "json", "txt"],
+        default="txt",
+        help="Format for output file with transcript / summary (default: txt)"
+    )
+    parser.add_argument(
+        "--llm-model",
+        type=str,
+        default="meta-llama-3.1-8b-instruct",
+        help="LLM model for summarization"
+    )
+    parser.add_argument(
+        "-m", "--model",
+        type=str,
+        default="large",
+        help="Whisper model which will be used (default: large)"
+    )
+
+    args = parser.parse_args()
+
+    # ---- apply runtime config ----
+    global CHUNK_DURATION, CHUNK_SIZE
+    CHUNK_DURATION = args.chunk_duration
+    CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
+    summarize_flag = args.summarize
+
+    # ---- resolve output paths ----
+    output_dir = Path(args.output or "output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    output_wav = Path(output_dir) / f"recording_{timestamp}.wav"
+    output_txt = output_wav.with_suffix(".txt")
+    summary_file = output_wav.with_name(output_wav.stem + "_summary." + args.format)
+
+    safe_print(f"Recording to: {output_wav}")
+    safe_print(f"Transcript:  {output_txt}")
+    if summarize_flag:
+        safe_print(f"Summary:  {summary_file}")
+
+
+
+
+    safe_print("-----------------------")
+    safe_print(f"Output audio     : {os.path.abspath(output_wav)}")
+    safe_print(f"Output transcript: {os.path.abspath(output_txt)}")
+    safe_print(f"Chunk duration   : {CHUNK_DURATION}s")
+    safe_print("-----------------------")
+
+    # ---- threads ----
+    record_thread = Thread(target=record_chunks, daemon=True)
+    transcribe_thread = Thread(target=transcribe_audio, args=(args.model,), daemon=True)
+    command_thread = Thread(target=command_listener, daemon=True)
 
     record_thread.start()
     transcribe_thread.start()
@@ -173,21 +293,57 @@ def main():
 
     try:
         record_thread.join()
-        print("Recording finished. Processing remaining chunks...")
-        audio_queue.join()
-        transcribe_thread.join()
     except KeyboardInterrupt:
-        print("\nCtrl+C detected, stopping...")
+        safe_print("\nStopping recording...")
         stop_event.set()
 
-    
+    stop_event.set()
+    audio_queue.join()
+    transcribe_thread.join()
     command_thread.join()
 
+    # ---- post-processing ----
     full_transcript.sort(key=lambda x: x.start)
 
-    print("\nFULL TRANSCRIPT:")
-    for seg in full_transcript:
-        print(seg.format())
+    merge_wav_files(all_chunk_files, output_wav)
+    cleanup_chunks(all_chunk_files)
+
+    with open(output_txt, "w", encoding="utf-8") as f:
+        for seg in full_transcript:
+            f.write(seg.format() + "\n")
+
+    safe_print(f"Audio saved to     : {output_wav}")
+    safe_print(f"Transcript saved to: {output_txt}")
+
+    if summarize_flag:
+        safe_print("Running transcript reconstruction and summarization...")
+        raw_text = output_txt.read_text(encoding="utf-8")
+
+        cleaned_file = output_txt.with_name(output_txt.stem + "_clean.txt")
+
+        ###summarizer.CHAT_MODEL = args.llm_model
+        meeting_parser.CHAT_MODEL = args.llm_model
+
+        list(summarizer.reconstruct_transcript(
+            raw_text,
+            terms_dict=summarizer.TERMS_TO_CORRECT,
+            output_file=cleaned_file
+        ))
+
+        minutes = meeting_parser.generate_meeting_minutes_from_file(cleaned_file)
+
+
+        # Save summary
+        if args.format == "json":
+            summary_file.write_text(minutes.to_json(), encoding="utf-8")
+        else:
+            meeting_parser.save_meeting_minutes(minutes, summary_file)
+
+
+    safe_print("Done!")
+
+
+
 
 if __name__ == "__main__":
     main()
