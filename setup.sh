@@ -1,7 +1,7 @@
 
 if ! command -v python3 &> /dev/null
 then
-    echo "Python3 nije instaliran. Instaliraj Python3 i pokreni skriptu ponovo."
+    echo "Python3 is not installed. Install Python3 and run the script again."
     exit 1
 fi
 
