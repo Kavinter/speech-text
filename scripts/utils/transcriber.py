@@ -13,6 +13,11 @@ class TranscriptSegment:
     end: float
     text: str
 
+    def format(self) -> str:
+        start_str = time.strftime('%H:%M:%S', time.gmtime(int(self.start)))
+        end_str = time.strftime('%H:%M:%S', time.gmtime(int(self.start)))
+        return f"[{start_str} - {end_str}] {self.text}"
+
 # Wrapper class for Whisper transcription
 class Transcriber:
     def __init__(self, model_size: str = "large", device: str = "cpu"):
@@ -56,15 +61,6 @@ class Transcriber:
 
         return segments
 
-# Format transcript segments into human-readable string
-def format_segments(segments: List[TranscriptSegment]) -> str:
-    lines = []
-    for seg in segments:
-        start_str = time.strftime('%H:%M:%S', time.gmtime(seg.start))
-        end_str = time.strftime('%H:%M:%S', time.gmtime(seg.end))
-        lines.append(f"[{start_str} - {end_str}] {seg.text}")
-    return "\n".join(lines)
-
 def main():
     parser = argparse.ArgumentParser(description="Speech to Text Transcription")
     parser.add_argument("audio_file", help="Path to the audio file")
@@ -101,7 +97,7 @@ def main():
             language="sr", verbose=args.verbose)
 
     # Format segments for output
-    formatted_text = format_segments(segments)
+    formatted_text = "\n".join(seg.format() for seg in segments)
 
     # Save to file or print to stdout
     if args.output:
