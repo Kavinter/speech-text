@@ -11,7 +11,7 @@ from queue import Queue
 from threading import Thread, Event, Lock
 from dataclasses import dataclass
 from pathlib import Path
-from utils import summarizer, meeting_parser
+from utils import summarizer, meeting_parser, diarizer
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -48,7 +48,6 @@ class TranscriptSegment:
 def safe_print(*args, **kwargs):
     with print_lock:
         print(*args, **kwargs)
-
 
 def save_chunk(data: np.ndarray, counter: int) -> str:
     temp_dir = tempfile.gettempdir()
@@ -250,6 +249,23 @@ def main():
         default="large",
         help="Whisper model which will be used (default: large)"
     )
+    parser.add_argument(
+    "--diarize",
+    action="store_true",
+    help="Enable speaker diarization (default: False)"
+    )
+    parser.add_argument(
+        "--num-speakers",
+        type=int,
+        default=-1,
+        help="Number of speakers in audio; -1 = auto-detect"
+    )
+    parser.add_argument(
+        "--speaker-map",
+        type=str,
+        help="Path to file mapping speaker IDs to names (SPEAKER_00=Marko)"
+    )
+
 
     args = parser.parse_args()
 
@@ -308,9 +324,19 @@ def main():
     merge_wav_files(all_chunk_files, output_wav)
     cleanup_chunks(all_chunk_files)
 
+    # ---- apply speaker diarization ----
+    if args.diarize:
+        safe_print("Running speaker diarization...")
+        merged_wav = output_wav
+        diarization_segments = diarizer.diarize(str(merged_wav), num_speakers=args.num_speakers)
+        speaker_map = diarizer.load_speaker_map(args.speaker_map) if args.speaker_map else None
+        segments_text = diarizer.assign_speakers_to_transcript(full_transcript, diarization_segments, speaker_map)
+    else:
+        segments_text = [seg.format() for seg in full_transcript]
+
     with open(output_txt, "w", encoding="utf-8") as f:
-        for seg in full_transcript:
-            f.write(seg.format() + "\n")
+        for line in segments_text:
+            f.write(line + "\n")
 
     safe_print(f"Audio saved to     : {output_wav}")
     safe_print(f"Transcript saved to: {output_txt}")

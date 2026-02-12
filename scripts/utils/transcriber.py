@@ -4,7 +4,7 @@ import time, pathlib
 from dataclasses import dataclass
 from faster_whisper import WhisperModel
 from typing import List, Optional
-from scripts.utils import audio_utils
+from scripts.utils import audio_utils, diarizer
 
 # Represents a segment of transcribed audio
 @dataclass
@@ -28,10 +28,7 @@ class Transcriber:
 
     # Transcribe an audio file
     def transcribe(self, audio_path: str, prompt: Optional[str] = None, language: Optional[str] = "sr", verbose=False) -> List[TranscriptSegment]:
-
-        if verbose:
-            print(f"Transcription finished in {time.time() - start_time:.2f}s")
-
+        
         start_time = time.time()
 
         segments: List[TranscriptSegment] = []
@@ -68,6 +65,10 @@ def main():
     parser.add_argument("-m", "--model", default="large", help="Whisper model (default: large)")
     parser.add_argument("--prompt", help="Whisper prompt text or path to a prompt file")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable detailed output")
+    parser.add_argument("--diarize", action="store_true", help="Enable speaker diarization (default: False)")
+    parser.add_argument("--num-speakers", type=int, default=-1, help="Number of speakers in audio; -1 = auto-detect")
+    parser.add_argument("--speaker-map", type=str, help="Path to file mapping speaker IDs to names (SPEAKER_00=Marko)")
+
     args = parser.parse_args()
 
     # Validate input audio
@@ -96,8 +97,15 @@ def main():
     segments = transcriber.transcribe(wav_file, prompt=prompt_text, 
             language="sr", verbose=args.verbose)
 
-    # Format segments for output
-    formatted_text = "\n".join(seg.format() for seg in segments)
+    if args.diarize:
+        # Perform speaker diarization
+        diarization_segments = diarizer.diarize(wav_file, num_speakers=args.num_speakers)
+        # Load speaker map if provided
+        speaker_map = diarizer.load_speaker_map(args.speaker_map) if args.speaker_map else None
+        # Assign speakers to transcript
+        segments_text = diarizer.assign_speakers_to_transcript(segments, diarization_segments, speaker_map)
+    else:
+        segments_text = [seg.format() for seg in segments]
 
     # Save to file or print to stdout
     if args.output:
@@ -106,11 +114,11 @@ def main():
             args.output = os.path.join(args.output, f"{base_name}.txt")
 
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(formatted_text)
+            f.write("\n".join(segments_text))
         if args.verbose:
             print(f"Result saved to: {args.output}")
     else:
-        print(formatted_text)
+        print("\n".join(segments_text))
 
     if args.verbose:
         print("Process completed.")

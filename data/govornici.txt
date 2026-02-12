@@ -1,0 +1,5 @@
+speaker_0=Marko
+speaker_1=Petar
+speaker_2=Ana
+speaker_3=Jelena
+

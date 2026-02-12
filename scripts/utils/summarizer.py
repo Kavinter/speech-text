@@ -1,7 +1,7 @@
 from pathlib import Path
 import requests
 from typing import Dict, Optional, List
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 
 # Optional dictionary of terms to replace (keep Serbian terms as-is)
 SRBGLISH_TERMS: Dict[str, str] = {}
