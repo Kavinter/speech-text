@@ -1,0 +1,103 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Audio Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/utils/audio_utils.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "data/audio1.mp3",
+                "output"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run Transcriber Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/utils/transcriber.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "data/audio1.mp3",
+                "--model", "large",
+                "--prompt", "Daily standup, sprint, merge request",
+                "--output", "output/konferencija.txt",
+                "--verbose"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run Summarizer Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/utils/summarizer.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "output/konferencija.txt"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+
+        },
+        {
+            "name": "Run Meeting Parser Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/utils/meeting_parser.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "data/sastanak.txt",
+                "config/prompts/llm_summary_system_prompt.txt",
+                "config/prompts/llm_summary_chunk_prompt.txt"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run Live Transcribe",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/live_transcribe.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--output", "output",
+                "--chunk-duration", "5",
+                "--llm-model", "meta-llama-3.1-8b-instruct",
+                "--model", "large",
+                "--summarize"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run Diarizer Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/utils/diarizer.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--audio-file", "data/shorts1.wav",
+                "--model", "large",
+                "--num-speakers", "-1"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ]
+}
