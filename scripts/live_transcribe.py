@@ -250,9 +250,9 @@ def main():
         help="Whisper model which will be used (default: large)"
     )
     parser.add_argument(
-    "--diarize",
-    action="store_true",
-    help="Enable speaker diarization (default: False)"
+        "--diarize",
+        action="store_true",
+        help="Enable speaker diarization (default: False)"
     )
     parser.add_argument(
         "--num-speakers",

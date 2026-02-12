@@ -80,7 +80,8 @@
                 "--chunk-duration", "5",
                 "--llm-model", "meta-llama-3.1-8b-instruct",
                 "--model", "large",
-                "--summarize"
+                "--summarize",
+                "--diarize"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
