@@ -77,7 +77,7 @@ def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] =
     # Add instructions for term replacements if provided
     dict_instructions = ""
     if terms_dict:
-        dict_instructions = "Koristi sledece ispravne termine:\n"
+        dict_instructions = "Use the following correct terms:\n"
         for k, v in terms_dict.items():
             dict_instructions += f"- {k} -> {v}\n"
 
@@ -96,7 +96,7 @@ def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] =
             "model": CHAT_MODEL,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": dict_instructions + "\nIspravi sledeći tekst:\n" + chunk_text_to_send}
+                {"role": "user", "content": dict_instructions + "\nCorrect the following text:\n" + chunk_text_to_send}
             ],
             "temperature": 0.0,
             "max_tokens": 300

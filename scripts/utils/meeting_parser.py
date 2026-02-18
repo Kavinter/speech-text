@@ -47,7 +47,7 @@ def process_chunk(chunk: str) -> str:
 # Generate meeting minutes from a transcript file
 def generate_meeting_minutes_from_file(file_path: Path, lm_api_url: str = LM_API_URL) -> MeetingMinutes:
     if not file_path.is_file():
-        raise FileNotFoundError(f"Fajl ne postoji: {file_path}")
+        raise FileNotFoundError(f"File doesn't exist: {file_path}")
 
     with open(file_path, "r", encoding="utf-8") as f:
         transcript_text = f.read()
