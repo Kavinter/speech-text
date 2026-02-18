@@ -17,12 +17,10 @@ def main():
 
     args = parser.parse_args()
 
-    # --- Validate audio ---
     if not audio_utils.validate_audio_format(args.audio_file):
         print(f"Invalid or non-existent audio file: {args.audio_file}")
         sys.exit(1)
 
-    # --- Load prompt ---
     prompt_text = None
     if args.prompt:
         if os.path.isfile(args.prompt):
@@ -34,17 +32,14 @@ def main():
     output_path = Path(args.output)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # --- Convert to 16kHz mono WAV ---
     wav_file = audio_utils.convert_to_wav_16k_mono(
         args.audio_file,
         args.output
     )
 
-    # --- Transcribe ---
     transcriber = Transcriber(model_size=args.model, device="cpu")
     segments = transcriber.transcribe(wav_file, prompt=prompt_text, language="sr", verbose=args.verbose)
 
-    # --- Diarization if enabled ---
     if args.diarize:
         diarization_segments = diarizer.diarize(wav_file, num_speakers=args.num_speakers)
         speaker_map = diarizer.load_speaker_map(args.speaker_map) if args.speaker_map else None
@@ -52,7 +47,6 @@ def main():
     else:
         segments_text = [seg.format() for seg in segments]
 
-   # --- Save raw transcript ---
     base_name = Path(wav_file).stem
     raw_output = output_path / f"{base_name}.txt"
     clean_output = output_path / f"{base_name}_clean.txt"
@@ -62,7 +56,6 @@ def main():
     if args.verbose:
         print(f"Raw transcript saved to: {raw_output}")
 
-    # --- Summarization / Cleaning ---
     raw_text = "\n".join(segments_text)
     list(summarizer.reconstruct_transcript(raw_text, terms_dict=summarizer.TERMS_TO_CORRECT, output_file=clean_output))
     if args.verbose:

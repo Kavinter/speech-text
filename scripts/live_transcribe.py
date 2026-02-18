@@ -269,13 +269,11 @@ def main():
 
     args = parser.parse_args()
 
-    # ---- apply runtime config ----
     global CHUNK_DURATION, CHUNK_SIZE
     CHUNK_DURATION = args.chunk_duration
     CHUNK_SIZE = SAMPLE_RATE * CHUNK_DURATION
     summarize_flag = args.summarize
 
-    # ---- resolve output paths ----
     output_dir = Path(args.output or "output")
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -298,7 +296,6 @@ def main():
     safe_print(f"Chunk duration   : {CHUNK_DURATION}s")
     safe_print("-----------------------")
 
-    # ---- threads ----
     record_thread = Thread(target=record_chunks, daemon=True)
     transcribe_thread = Thread(target=transcribe_audio, args=(args.model,), daemon=True)
     command_thread = Thread(target=command_listener, daemon=True)
@@ -324,7 +321,6 @@ def main():
     merge_wav_files(all_chunk_files, output_wav)
     cleanup_chunks(all_chunk_files)
 
-    # ---- apply speaker diarization ----
     if args.diarize:
         safe_print("Running speaker diarization...")
         merged_wav = output_wav
