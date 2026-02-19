@@ -1,11 +1,12 @@
-From the following part of the transcript, extract:
+Iz sledećeg dela transkripta izvuci:
 
-- Key topics
-- Decisions made (if any)
-- Action items (if any)
-- Important discussions and arguments
+- Ključne teme
+- Donete odluke
+- Akcione stavke 
+- Važne diskusije i argumente
 
-Ignore all timecodes in the format [hh:mm:ss - hh:mm:ss].
+Ignoriši sve vremenske oznake u formatu [hh:mm:ss - hh:mm:ss].
 
-Respond in plain text, using short bullet points.
-Do not use JSON.
+Odgovori u običnom tekstu, u kratkim stavkama
+Ne koristi JSON.
+

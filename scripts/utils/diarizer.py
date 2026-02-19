@@ -129,16 +129,18 @@ def assign_speakers_to_transcript(transcript, diarization_segments, speaker_map=
         if speaker_map:
             if " + " in assigned_label:
                 parts = assigned_label.split(" + ")
-                assigned_label = " + ".join(speaker_map.get(p, p) for p in parts)
+                assigned_label = " + ".join(speaker_map.get(p, p) or p for p in parts)
             else:
-                assigned_label = speaker_map.get(assigned_label, assigned_label)
+                assigned_label = speaker_map.get(assigned_label, assigned_label) or assigned_label
+
 
         previous_speaker = assigned_label
 
+        segment_text = t_seg.text.strip() if t_seg.text else ""
         output_segments.append(
             f"[{time.strftime('%H:%M:%S', time.gmtime(seg_start))} - "
             f"{time.strftime('%H:%M:%S', time.gmtime(seg_end))}] "
-            f"({assigned_label}) {t_seg.text.strip()}"
+            f"({assigned_label}) {segment_text}"
         )
 
     return output_segments

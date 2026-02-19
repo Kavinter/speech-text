@@ -1,18 +1,18 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional, List
 
 class MeetingCreate(BaseModel):
     title: str
-    description: str | None = None
-    start_time: datetime
-    end_time: datetime | None = None
+    date: datetime
 
 class MeetingRead(BaseModel):
     id: int
     title: str
-    description: str | None
-    start_time: datetime
-    end_time: datetime | None
+    date: datetime
+    audio_file_path: str
+    duration: Optional[float]
+    status: str
+    created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

@@ -1,6 +1,6 @@
 import requests
 from pathlib import Path
-from utils.summarizer import parse_meeting_minutes, MeetingMinutes
+from scripts.utils.summarizer import parse_meeting_minutes, MeetingMinutes
 
 # LLM endpoint
 LM_API_URL = "http://localhost:1234/v1/chat/completions"
@@ -78,7 +78,7 @@ def generate_meeting_minutes_from_file(file_path: Path, lm_api_url: str = LM_API
       ],
       "grammar": GRAMMAR,
       "temperature": 0.0,
-      "max_tokens": 1200
+      "max_tokens": 2048
   }
 
     try:
@@ -91,6 +91,8 @@ def generate_meeting_minutes_from_file(file_path: Path, lm_api_url: str = LM_API
         raise
 
     # Parse JSON into MeetingMinutes object
+    print("LLM JSON output:")
+    print(llm_json) 
     meeting_minutes = parse_meeting_minutes(llm_json)
     return meeting_minutes
 

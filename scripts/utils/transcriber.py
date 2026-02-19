@@ -12,7 +12,7 @@ class TranscriptSegment:
 
     def format(self) -> str:
         start_str = time.strftime('%H:%M:%S', time.gmtime(int(self.start)))
-        end_str = time.strftime('%H:%M:%S', time.gmtime(int(self.start)))
+        end_str = time.strftime('%H:%M:%S', time.gmtime(int(self.end)))
         return f"[{start_str} - {end_str}] {self.text}"
 
 # Wrapper class for Whisper transcription

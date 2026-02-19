@@ -1,9 +1,11 @@
 import os, sys
 import ffmpeg
 from pathlib import Path
-
+import wave
+import contextlib
 
 SUPPORTED_AUDIO_FORMATS = {".mp3", ".mp4", ".m4a", ".wav", ".ogg", ".webm"}
+
 
 def validate_audio_format(file_path: str) -> bool:
     p = Path(file_path)
@@ -48,6 +50,16 @@ def convert_to_wav_16k_mono(input_path: str, output_dir: str, verbose: bool = Fa
 
     return output_path
 
+def get_audio_duration(wav_path: str) -> float:
+    path = Path(wav_path)
+    if not path.exists():
+        raise FileNotFoundError(f"WAV file not found: {wav_path}")
+
+    with contextlib.closing(wave.open(str(path), 'r')) as wf:
+        frames = wf.getnframes()
+        rate = wf.getframerate()
+        duration = frames / float(rate)
+        return duration
 
 if __name__ == "__main__":
     if len(sys.argv) >= 3:

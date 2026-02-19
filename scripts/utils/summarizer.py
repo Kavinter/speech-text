@@ -2,24 +2,21 @@ from pathlib import Path
 import requests
 from typing import Dict, Optional, List
 from pydantic import BaseModel, ValidationError
+from transliterate import translit
 
 # Optional dictionary of terms to replace (keep Serbian terms as-is)
 SRBGLISH_TERMS: Dict[str, str] = {}
 
-TERMS_TO_CORRECT = {
-    "šestručnom": "šef stručnom"
-}
-
 # Instructions for the LM to clean the transcript
 SYSTEM_PROMPT = """
-You are a tool for cleaning speech transcripts.
-Your task is to:
-- fix spelling and grammar errors,
-- convert text from ijekavica to ekavica,
-- do not change the meaning of the text,
-- do not add new sentences,
-- keep all timecodes in the format [hh:mm:ss - hh:mm:ss],
-- after each timecode, write the corrected text.
+Ti si alat za čišćenje transkripata govora.
+Tvoj zadatak je da:
+- ispraviš pravopisne i gramatičke greške,
+- prebacuješ tekst iz ijekavice u ekavicu,
+- ne menjaš značenje teksta,
+- ne dodaješ nove rečenice,
+- zadržiš sve vremenske oznake u formatu [hh:mm:ss - hh:mm:ss],
+- posle njih ispisuješ ispravljen tekst.
 """
 
 LM_API_URL = "http://localhost:1234/v1/chat/completions"
@@ -63,6 +60,11 @@ def parse_meeting_minutes(llm_json: str) -> MeetingMinutes:
         print("Invalid meeting minutes JSON.")
         raise
 
+def to_latin(text: str) -> str:
+    try:
+        return translit(text, "sr", reversed=True)
+    except Exception:
+        return text
 
 # Yield chunks of text for processing
 def chunk_text(lines, chunk_size=5):
@@ -91,6 +93,8 @@ def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] =
 
     for chunk_lines in chunk_text(lines, chunk_size=5):
         chunk_text_to_send = "\n".join(chunk_lines)
+
+        chunk_text_to_send = to_latin(chunk_text_to_send)
 
         payload = {
             "model": CHAT_MODEL,
@@ -150,7 +154,7 @@ if __name__ == "__main__":
         raw_text = f.read()
 
     # Run reconstruction / cleaning
-    for _ in reconstruct_transcript(raw_text, terms_dict=TERMS_TO_CORRECT, output_file=output_file):
+    for _ in reconstruct_transcript(raw_text, output_file=output_file):
         pass
 
     print(f"Cleaning completed, result saved at: {output_file}")

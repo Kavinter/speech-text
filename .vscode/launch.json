@@ -97,7 +97,7 @@
             "args": [
                 "--audio-file", "data/shorts4.mp3",
                 "--model", "large",
-                "--num-speakers", "2"
+                "--num-speakers", "-1"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
@@ -117,13 +117,16 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "app.main:app", 
+                "backend.app.main:app",
                 "--reload",
                 "--host", "127.0.0.1",
                 "--port", "8000"
             ],
-            "cwd": "${workspaceFolder}/backend",
-            "console": "integratedTerminal"
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/backend:${workspaceFolder}/scripts"
+            }
         }
 
 
