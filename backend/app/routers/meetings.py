@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
-import shutil, json, os
+import json, os
 from datetime import datetime
 
 from app import models, schemas
 from app.database import get_db, SessionLocal
-from scripts.utils import audio_utils, diarizer, summarizer, meeting_parser
-from scripts.utils.transcriber import Transcriber
+from app.services.processing_service import ProcessingService
+from app.services.meeting_parser import MeetingParserService
 
 
 router = APIRouter(
@@ -26,95 +26,80 @@ def process_meeting_audio(meeting_id: int, audio_path: str):
     db = SessionLocal()
 
     try:
-        meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+        meeting = db.query(models.Meeting).filter(
+            models.Meeting.id == meeting_id
+        ).first()
+
         if not meeting:
             return
 
         meeting.status = "processing"
         db.commit()
 
-        # Convert to 16kHz mono
-        converted_audio = audio_utils.convert_to_wav_16k_mono(
-            audio_path,
-            str(OUTPUT_DIR)
+        processing_service = ProcessingService(
+            num_speakers=NUM_SPEAKERS,
+            model_size="large",
+            device="cpu"
         )
 
-        meeting.duration = audio_utils.get_audio_duration(converted_audio)
-        db.commit()
-
-        # Transcription
-        transcriber = Transcriber(model_size="large")
-        segments = transcriber.transcribe(converted_audio, language="sr")
-
-        raw_text = "\n".join([s for s in (seg.format() for seg in segments or []) if s])
-
-
-        raw_output_file = OUTPUT_DIR / f"{meeting_id}_raw.txt"
-        raw_output_file.write_text(raw_text, encoding="utf-8")
-
-        # Clean transcript
-        cleaned_file = OUTPUT_DIR / f"{meeting_id}_clean.txt"
-        list(
-            summarizer.reconstruct_transcript(
-                raw_text,
-                output_file=cleaned_file
-            )
+        result = processing_service.process_meeting_audio(
+            audio_path=audio_path,
+            output_dir=OUTPUT_DIR
         )
 
-        # Changing segments to use cleaned text instead of raw text
-        clean_lines = cleaned_file.read_text(encoding="utf-8").splitlines()
-        for seg, clean_line in zip(segments, clean_lines):
-            if "]" in clean_line:
-                seg.text = clean_line.split("]", 1)[1].strip()
+        # =============================
+        # UPDATE MEETING
+        # =============================
 
-        # Speaker diarization
-        diarization_segments = diarizer.diarize(converted_audio, NUM_SPEAKERS)
+        meeting.duration = result["duration"]
 
-        detected_labels = sorted(
-            set(f"speaker_{seg.speaker}" for seg in diarization_segments)
-        )
+        # Remove old transcript/summary/speakers if re-processing
+        db.query(models.Transcript).filter(
+            models.Transcript.meeting_id == meeting_id
+        ).delete()
 
-        speaker_map = {label: None for label in detected_labels}
-        
-        segments_text = diarizer.assign_speakers_to_transcript(
-            transcript=segments,
-            diarization_segments=diarization_segments,
-            speaker_map=speaker_map
-        )
+        db.query(models.Summary).filter(
+            models.Summary.meeting_id == meeting_id
+        ).delete()
 
-        reconstructed_with_speakers = "\n".join([s for s in segments_text if s])
-
-        # Remove old speakers if re-processing
         db.query(models.Speaker).filter(
             models.Speaker.meeting_id == meeting_id
         ).delete()
 
-        # Save Transcript
+        # =============================
+        # SAVE TRANSCRIPT
+        # =============================
+
         db_transcript = models.Transcript(
             meeting_id=meeting_id,
-            raw_text=raw_text,
-            reconstructed_text=reconstructed_with_speakers
+            raw_text=result["raw_text"],
+            reconstructed_text=result["reconstructed_text"]
         )
+
         db.add(db_transcript)
 
-        ### Test with example meeting txt, because example audios are not from meetings.
-        test_tekst = Path("data/sastanak.txt")
+        # =============================
+        # SAVE SUMMARY
+        # =============================
 
-        # Generate Summary
-        minutes = meeting_parser.generate_meeting_minutes_from_file(test_tekst)
+        summary = result["summary"]
 
         db_summary = models.Summary(
             meeting_id=meeting_id,
-            executive_summary=minutes.executive_summary,
-            topics_json=json.dumps(minutes.topics),
-            decisions_json=json.dumps([d.model_dump() for d in minutes.decisions]),
-            action_items_json=json.dumps([a.model_dump() for a in minutes.action_items]),
-            discussions_json=json.dumps([d.model_dump() for d in minutes.discussions])
+            executive_summary=summary["executive_summary"],
+            topics_json=json.dumps(summary["topics"]),
+            decisions_json=json.dumps(summary["decisions"]),
+            action_items_json=json.dumps(summary["action_items"]),
+            discussions_json=json.dumps(summary["discussions"])
         )
+
         db.add(db_summary)
 
-        # Save speakers in DB
-        for label in detected_labels:
+        # =============================
+        # SAVE SPEAKERS
+        # =============================
+
+        for label in result["detected_speakers"]:
             db.add(models.Speaker(
                 meeting_id=meeting_id,
                 label=label,
@@ -126,7 +111,11 @@ def process_meeting_audio(meeting_id: int, audio_path: str):
 
     except Exception as e:
         print(f"Processing error: {e}")
-        meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+
+        meeting = db.query(models.Meeting).filter(
+            models.Meeting.id == meeting_id
+        ).first()
+
         if meeting:
             meeting.status = "failed"
             db.commit()
@@ -257,26 +246,29 @@ def export_meeting(meeting_id: int, format: str = "txt", db: Session = Depends(g
         return FileResponse(out_file, media_type="application/json", filename=out_file.name)
 
     elif format in ["txt", "md"]:
+
+        out_file = OUTPUT_DIR / f"meeting_{meeting_id}.{format}"
+
         lines = []
+
         if transcript:
             lines.append("--- Transcript ---")
             lines.append(transcript.reconstructed_text)
+            lines.append("")
+
         if summary:
-            lines.append("--- Executive Summary ---")
-            lines.append(summary.executive_summary or "")
-            lines.append("--- Topics ---")
-            lines.extend(json.loads(summary.topics_json))
-            lines.append("--- Decisions ---")
-            for d in json.loads(summary.decisions_json):
-                lines.append(f"{d['decision']}: {d['rationale']}")
-            lines.append("--- Action Items ---")
-            for a in json.loads(summary.action_items_json):
-                lines.append(f"{a['task']} (assignee: {a['assignee']}, deadline: {a['deadline']})")
-            lines.append("--- Discussions ---")
-            for disc in json.loads(summary.discussions_json):
-                lines.append(f"{disc['topic']}: {disc['conclusion']}")
-        out_file = AUDIO_DIR / f"meeting_{meeting_id}.{format}"
+            minutes = MeetingParserService.from_db_summary(summary)
+
+            temp_summary_file = OUTPUT_DIR / f"_temp_summary_{meeting_id}.txt"
+            MeetingParserService.save_minutes_to_file(minutes, temp_summary_file)
+
+            summary_text = temp_summary_file.read_text(encoding="utf-8")
+            lines.append(summary_text)
+
+            temp_summary_file.unlink(missing_ok=True)
+
         out_file.write_text("\n".join(lines), encoding="utf-8")
+
         return FileResponse(out_file, media_type="text/plain", filename=out_file.name)
 
     else:

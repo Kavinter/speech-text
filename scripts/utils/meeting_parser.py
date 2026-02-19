@@ -91,8 +91,6 @@ def generate_meeting_minutes_from_file(file_path: Path, lm_api_url: str = LM_API
         raise
 
     # Parse JSON into MeetingMinutes object
-    print("LLM JSON output:")
-    print(llm_json) 
     meeting_minutes = parse_meeting_minutes(llm_json)
     return meeting_minutes
 
