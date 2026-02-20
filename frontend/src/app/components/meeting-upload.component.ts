@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { NgIf} from '@angular/common';
 
 @Component({
   standalone: true,
@@ -18,7 +20,9 @@ import { MatCardModule } from '@angular/material/card';
     MatInputModule,
     MatButtonModule,
     MatCardModule,
-    RouterModule
+    RouterModule,
+    MatCheckboxModule,
+    NgIf
   ]
 })
 export class MeetingUploadComponent {
@@ -26,6 +30,8 @@ export class MeetingUploadComponent {
   date = '';
   file?: File;
   uploading = false;
+  diarization = false;
+  numSpeakers: number | null = null;
 
   constructor(private meetingService: MeetingService, private router: Router) {}
 
@@ -35,7 +41,7 @@ export class MeetingUploadComponent {
 
   upload(): void {
     if (!this.title || !this.date || !this.file) {
-      alert('All fields are required');
+      alert('Title, date, and audio file are required');
       return;
     }
 
@@ -43,6 +49,10 @@ export class MeetingUploadComponent {
     formData.append('title', this.title);
     formData.append('date', this.date);
     formData.append('file', this.file);
+    formData.append('diarization', String(this.diarization));
+    if (this.diarization && this.numSpeakers) {
+      formData.append('num_speakers', String(this.numSpeakers));
+    }
 
     this.uploading = true;
     this.meetingService.uploadMeeting(formData).subscribe({

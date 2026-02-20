@@ -13,6 +13,7 @@ from .meeting_parser import MeetingParserService
 class ProcessingService:
     def __init__(
         self,
+        diarization: bool = False,
         num_speakers: int = -1,
         cluster_threshold: float = 0.5,
         model_size: str = "large",
@@ -23,11 +24,17 @@ class ProcessingService:
             model_size=model_size,
             device=device
         )
-        self.diarizer = DiarizationService(
-            num_speakers=num_speakers,
-            cluster_threshold=cluster_threshold
-        )
         self.summarizer = SummarizerService()
+        self.meeting_parser = MeetingParserService()
+        self.num_speakers = num_speakers
+        self.cluster_threshold = cluster_threshold
+        self.diarization_enabled = diarization
+        self.diarizer = None
+        if diarization:
+            self.diarizer = DiarizationService(
+                num_speakers=num_speakers, 
+                cluster_threshold=cluster_threshold
+            )
 
     def process_meeting_audio(
         self,
@@ -70,27 +77,20 @@ class ProcessingService:
             if "]" in line:
                 seg.text = line.split("]", 1)[1].strip()
 
-        diarization_segments = self.diarizer.diarize(wav_path)
+        reconstructed_text = "\n".join([seg.format() for seg in segments])
+        detected_labels = []
 
-        detected_labels = sorted({
-            f"speaker_{seg.speaker}" for seg in diarization_segments
-        })
+        if self.diarization_enabled and self.diarizer:
+            diarization_segments = self.diarizer.diarize(str(wav_path))
+            detected_labels = sorted({f"speaker_{seg.speaker}" for seg in diarization_segments})
+            speaker_map = {label: None for label in detected_labels}
 
-        speaker_map = {label: None for label in detected_labels}
-
-        segments_text = self.diarizer.assign_speakers(
-            segments,
-            diarization_segments,
-            speaker_map
-        )
-
-        reconstructed_with_speakers = "\n".join(
-            [s for s in segments_text if s]
-        )
+            segments_text = self.diarizer.assign_speakers(segments, diarization_segments, speaker_map)
+            reconstructed_text = "\n".join([s for s in segments_text if s])
 
         transcript_file = output_dir / f"{Path(audio_path).stem}_final.txt"
         transcript_file.write_text(
-            reconstructed_with_speakers,
+            reconstructed_text,
             encoding="utf-8"
         )
 
@@ -109,7 +109,7 @@ class ProcessingService:
         return {
             "duration": duration,
             "raw_text": raw_text,
-            "reconstructed_text": reconstructed_with_speakers,
+            "reconstructed_text": reconstructed_text,
             "detected_speakers": detected_labels,
             "summary": summary_dict
         }

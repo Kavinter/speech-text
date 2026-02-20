@@ -1,4 +1,4 @@
-<div class="upload-container">
+<div class = "upload-container">
   <mat-card class="upload-card">
     <h2>Upload Meeting</h2>
 
@@ -18,6 +18,15 @@
         <input id="audio-file" type="file" (change)="onFileSelected($event)" required />
       </div>
 
+      <mat-checkbox [(ngModel)]="diarization" name="diarization">
+        Enable diarization
+      </mat-checkbox>
+
+      <mat-form-field appearance="fill" class="full-width" *ngIf="diarization">
+        <mat-label>Number of speakers</mat-label>
+        <input matInput type="number" [(ngModel)]="numSpeakers" name="numSpeakers" min="1" />
+      </mat-form-field>
+
       <div class="buttons">
         <button mat-raised-button color="primary" type="submit" [disabled]="uploading">
           Upload
@@ -28,6 +37,5 @@
     <div class="home-button">
       <button mat-stroked-button color="accent" routerLink="/">Home</button>
     </div>
-
   </mat-card>
 </div>

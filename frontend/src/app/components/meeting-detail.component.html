@@ -1,29 +1,90 @@
-<div *ngIf="meeting$ | async as meeting; else loading">
+<div *ngIf="meeting$ | async as meeting; else loading" class="meeting-detail-container">
 
-  <div *ngIf="processing" class="overlay">
-    <div class="overlay-text">Meeting is currently processing...</div>
+  <!-- OVERLAY for processing -->
+  <div class="overlay" *ngIf="processing">
+    <div class="overlay-content">
+      <p>Meeting is currently processing...</p>
+      <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+    </div>
   </div>
 
-  <h2>{{ meeting.title }}</h2>
-  <p>Date: {{ meeting.date | date:'short' }}</p>
-  <p>Status: {{ meeting.status }}</p>
-  <button (click)="processMeeting(meeting)">Process Meeting</button>
-  <button (click)="exportMeeting(meeting, 'json')">Export JSON</button>
-  <button (click)="exportMeeting(meeting, 'txt')">Export TXT</button>
+  <!-- MEETING INFO -->
+  <mat-card class="meeting-card">
+    <mat-card-title class="text-center">{{ meeting.title }}</mat-card-title>
+    <mat-card-subtitle class="text-center">{{ meeting.date | date:'short' }}</mat-card-subtitle>
 
-  <h3>Speakers</h3>
-  <div *ngFor="let sp of meeting.speakers">
-    <label>{{ sp.label }}:
-      <input [(ngModel)]="sp.name" placeholder="Unesite ime" />
-      <small *ngIf="!sp.name">(currently empty)</small>
-    </label>
-  </div>
-  <button (click)="updateSpeakers(meeting)">Update Speakers</button>
+    <mat-card-content class="text-center">
+      <p><strong>Status:</strong> {{ meeting.status }}</p>
+      <p *ngIf="meeting.duration"><strong>Duration:</strong> {{ meeting.duration | number:'1.0-0' }} s</p>
+    </mat-card-content>
+
+    <mat-card-actions class="card-actions-center">
+      <button mat-raised-button color="primary" (click)="processMeeting(meeting)" 
+              [disabled]="processing || meeting.status === 'completed'">Process Meeting</button>
+      <button mat-stroked-button color="accent" (click)="exportMeeting(meeting, 'txt')">Export Summary (TXT)</button>
+      <button mat-stroked-button color="accent" (click)="exportMeeting(meeting, 'json')">Export JSON</button>
+      <button mat-stroked-button color="accent" (click)="exportMeeting(meeting, 'md')">Export MD</button>
+    </mat-card-actions>
+  </mat-card>
+
+  <!-- TABS -->
+  <mat-tab-group class="meeting-tabs">
+  <!-- 1. Summary / Zapisnik -->
+  <mat-tab label="Zapisnik">
+    <mat-card class="meeting-card">
+      <mat-card-content>
+        <pre *ngIf="meeting.summaries?.length">
+          {{ meeting.summaries[0].executive_summary }}
+          <ng-container *ngFor="let topic of meeting.summaries[0].topics">Topic: {{ topic }}</ng-container>
+          <ng-container *ngFor="let decision of meeting.summaries[0].decisions">Decision: {{ decision }}</ng-container>
+          <ng-container *ngFor="let action of meeting.summaries[0].action_items">Action: {{ action }}</ng-container>
+          <ng-container *ngFor="let disc of meeting.summaries[0].discussions">Discussion: {{ disc }}</ng-container>
+        </pre>
+        <p *ngIf="!meeting.summaries?.length">No summary available.</p>
+      </mat-card-content>
+    </mat-card>
+  </mat-tab>
+
+  <!-- 2. Reconstructed Transcript -->
+  <mat-tab label="Transkript">
+    <mat-card class="meeting-card">
+      <mat-card-content>
+        <pre *ngIf="meeting.transcript && meeting.transcript.reconstructed_text">{{ meeting.transcript.reconstructed_text }}</pre>
+        <p *ngIf="!meeting.transcript?.reconstructed_text">No reconstructed transcript available.</p>
+      </mat-card-content>
+    </mat-card>
+  </mat-tab>
+
+  <!-- 3. Raw Transcript -->
+  <mat-tab label="Raw Transcript">
+    <mat-card class="meeting-card">
+      <mat-card-content>
+        <pre *ngIf="meeting.transcript && meeting.transcript.raw_text">{{ meeting.transcript.raw_text }}</pre>
+        <p *ngIf="!meeting.transcript?.raw_text">No raw transcript available.</p>
+      </mat-card-content>
+    </mat-card>
+  </mat-tab>
+</mat-tab-group>
+
+  <!-- SPEAKERS -->
+  <mat-card class="meeting-card" *ngIf="meeting.speakers && meeting.speakers.length > 0">
+    <mat-card-title class="text-center">Speakers</mat-card-title>
+    <mat-card-content>
+      <div *ngFor="let sp of meeting.speakers" class="speaker-row">
+        <label>{{ sp.label }}:</label>
+        <input [(ngModel)]="sp.name" placeholder="Enter name" />
+      </div>
+    </mat-card-content>
+    <mat-card-actions class="card-actions-center">
+      <button mat-raised-button color="primary" (click)="updateSpeakers(meeting)">Update Speakers</button>
+    </mat-card-actions>
+  </mat-card>
 
 </div>
 
-<button routerLink="/">Home</button>
-
 <ng-template #loading>
-  <div>Loading...</div>
+  <div class="loading-container">
+    <p>Loading meeting details...</p>
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
 </ng-template>

@@ -24,7 +24,7 @@ export interface Meeting {
   audio_file_path?: string;
   duration?: number;
   transcript?: Transcript;
-  summary?: Summary;
+  summaries?: Summary[];
   speakers?: Speaker[];
 }
 

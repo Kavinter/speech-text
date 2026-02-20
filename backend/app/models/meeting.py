@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, Float
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Float, Boolean
 from ..database import Base
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
@@ -20,6 +20,8 @@ class Meeting(Base):
     duration = Column(Float, nullable=True)
     status = Column(Enum(MeetingStatus), default=MeetingStatus.pending, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    num_speakers = Column(Integer, default=-1)
+    diarization = Column(Boolean, default=False)
     transcripts = relationship("Transcript", back_populates="meeting", cascade="all, delete-orphan")
     summaries = relationship("Summary", back_populates="meeting", cascade="all, delete-orphan")
     speakers = relationship("Speaker", back_populates="meeting", cascade="all, delete-orphan")

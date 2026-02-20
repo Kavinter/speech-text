@@ -20,7 +20,6 @@ AUDIO_DIR = Path("data")
 OUTPUT_DIR = Path("output")
 AUDIO_DIR.mkdir(exist_ok=True, parents=True)
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
-NUM_SPEAKERS = 2
 
 def process_meeting_audio(meeting_id: int, audio_path: str):
     db = SessionLocal()
@@ -37,7 +36,8 @@ def process_meeting_audio(meeting_id: int, audio_path: str):
         db.commit()
 
         processing_service = ProcessingService(
-            num_speakers=NUM_SPEAKERS,
+            diarization=meeting.diarization,
+            num_speakers=meeting.num_speakers,
             model_size="large",
             device="cpu"
         )
@@ -123,22 +123,35 @@ def process_meeting_audio(meeting_id: int, audio_path: str):
     finally:
         db.close()
 
+def replace_speaker_labels(text: str, speakers: list[models.Speaker]) -> str:
+    new_text = text
+    for sp in speakers:
+        if sp.name:
+            new_text = new_text.replace(sp.label, sp.name)
+    return new_text
 
 @router.post("/", response_model=schemas.MeetingRead)
 async def create_meeting(
     title: str = Form(...),
     date: str = Form(...),
     file: UploadFile = File(...),
+    diarization: bool = Form(False),
+    num_speakers: int = Form(-1),
     db: Session = Depends(get_db)
 ):
     
     audio_path = AUDIO_DIR / file.filename
+    if not audio_path.exists():
+        with open(audio_path, "wb") as f:
+            f.write(await file.read())
 
     meeting = models.Meeting(
         title=title,
         date=datetime.fromisoformat(date),
         audio_file_path=str(audio_path),
-        status="pending"
+        status="pending",
+        diarization=diarization,
+        num_speakers=num_speakers if diarization else -1
     )
     db.add(meeting)
     db.commit()
@@ -208,9 +221,20 @@ def update_speakers(meeting_id: int, speakers: list[schemas.SpeakerCreate], db: 
             speaker.name = sp.name
         else:
             db.add(models.Speaker(meeting_id=meeting_id, label=sp.label, name=sp.name))
-    db.commit()
-    return {"detail": "Speakers updated"}
+    all_speakers = db.query(models.Speaker).filter(models.Speaker.meeting_id == meeting_id).all()
 
+    # Update transcript
+    transcript = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+    if transcript:
+        transcript.reconstructed_text = replace_speaker_labels(transcript.reconstructed_text, all_speakers)
+    
+    # Update summary executive_summary
+    summary = db.query(models.Summary).filter(models.Summary.meeting_id == meeting_id).first()
+    if summary:
+        summary.executive_summary = replace_speaker_labels(summary.executive_summary, all_speakers)
+    
+    db.commit()
+    return {"detail": "Speakers updated and transcript/summary refreshed"}
 
 @router.get("/{meeting_id}/export")
 def export_meeting(meeting_id: int, format: str = "txt", db: Session = Depends(get_db)):
