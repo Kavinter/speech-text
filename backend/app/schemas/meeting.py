@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
+from .speaker import SpeakerRead
 
 class MeetingCreate(BaseModel):
     title: str
@@ -14,5 +15,6 @@ class MeetingRead(BaseModel):
     duration: Optional[float]
     status: str
     created_at: datetime
+    speakers: List[SpeakerRead] = []
 
     model_config = {"from_attributes": True}

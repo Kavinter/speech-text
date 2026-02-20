@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pathlib import Path
 import json, os
 from datetime import datetime
@@ -148,15 +148,18 @@ async def create_meeting(
 
 @router.get("/", response_model=list[schemas.MeetingRead])
 def list_meetings(db: Session = Depends(get_db)):
-    meetings = db.query(models.Meeting).order_by(models.Meeting.created_at.desc()).all()
+    meetings = db.query(models.Meeting).options(joinedload(models.Meeting.speakers)).order_by(models.Meeting.created_at.desc()).all()
     return meetings
 
 
 @router.get("/{meeting_id}", response_model=schemas.MeetingRead)
 def get_meeting(meeting_id: int, db: Session = Depends(get_db)):
-    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    meeting = db.query(models.Meeting).options(joinedload(models.Meeting.speakers)).filter(models.Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    meeting.speakers
+
     return meeting
 
 
@@ -165,10 +168,6 @@ def delete_meeting(meeting_id: int, db: Session = Depends(get_db)):
     meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
-
-    # delete audio file
-    if meeting.audio_file_path and os.path.isfile(meeting.audio_file_path):
-        os.remove(meeting.audio_file_path)
 
     db.delete(meeting)
     db.commit()
@@ -242,7 +241,7 @@ def export_meeting(meeting_id: int, format: str = "txt", db: Session = Depends(g
             "speakers": [{ "label": s.label, "name": s.name } for s in speakers]
         }
         out_file = OUTPUT_DIR / f"meeting_{meeting_id}.json"
-        out_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        out_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         return FileResponse(out_file, media_type="application/json", filename=out_file.name)
 
     elif format in ["txt", "md"]:

@@ -1,0 +1,29 @@
+<div *ngIf="meeting$ | async as meeting; else loading">
+
+  <div *ngIf="processing" class="overlay">
+    <div class="overlay-text">Meeting is currently processing...</div>
+  </div>
+
+  <h2>{{ meeting.title }}</h2>
+  <p>Date: {{ meeting.date | date:'short' }}</p>
+  <p>Status: {{ meeting.status }}</p>
+  <button (click)="processMeeting(meeting)">Process Meeting</button>
+  <button (click)="exportMeeting(meeting, 'json')">Export JSON</button>
+  <button (click)="exportMeeting(meeting, 'txt')">Export TXT</button>
+
+  <h3>Speakers</h3>
+  <div *ngFor="let sp of meeting.speakers">
+    <label>{{ sp.label }}:
+      <input [(ngModel)]="sp.name" placeholder="Unesite ime" />
+      <small *ngIf="!sp.name">(currently empty)</small>
+    </label>
+  </div>
+  <button (click)="updateSpeakers(meeting)">Update Speakers</button>
+
+</div>
+
+<button routerLink="/">Home</button>
+
+<ng-template #loading>
+  <div>Loading...</div>
+</ng-template>

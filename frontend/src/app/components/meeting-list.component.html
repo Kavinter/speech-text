@@ -1,0 +1,29 @@
+<h2 class="page-title">Meetings</h2>
+
+<div *ngIf="meetings$ | async as meetings; else loading" class="meetings-container">
+  <ng-container *ngIf="meetings.length > 0; else noMeetings">
+    <mat-card class="meeting-card" *ngFor="let meeting of meetings">
+      <mat-card-title>{{ meeting.title }}</mat-card-title>
+      <mat-card-subtitle>{{ meeting.date | date:'short' }}</mat-card-subtitle>
+      <p>Status: {{ meeting.status }}</p>
+      <p>{{ meeting.speakers?.length || 0 }} speakers</p>
+      <div class="actions">
+        <button mat-flat-button color="primary" [routerLink]="['/meetings', meeting.id]">Details</button>
+        <button mat-stroked-button color="warn" (click)="deleteMeeting(meeting.id)">Delete</button>
+      </div>
+    </mat-card>
+  </ng-container>
+</div>
+
+<ng-template #loading>
+  <div class="center-text">Loading...</div>
+</ng-template>
+
+<ng-template #noMeetings>
+  <div class="center-text">No meetings found.</div>
+</ng-template>
+
+<div class="home-link">
+  <button mat-flat-button color="accent" routerLink="/">Home</button>
+  <button mat-flat-button color="primary" routerLink="/meetings/upload">Upload new meeting</button>
+</div>

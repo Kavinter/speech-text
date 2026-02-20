@@ -1,0 +1,33 @@
+<div class="upload-container">
+  <mat-card class="upload-card">
+    <h2>Upload Meeting</h2>
+
+    <form (ngSubmit)="upload()" class="upload-form">
+      <mat-form-field appearance="fill" class="full-width">
+        <mat-label>Title</mat-label>
+        <input matInput type="text" [(ngModel)]="title" name="title" required />
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="full-width">
+        <mat-label>Date</mat-label>
+        <input matInput type="date" [(ngModel)]="date" name="date" required />
+      </mat-form-field>
+
+      <div class="full-width">
+        <label for="audio-file">Audio File:</label>
+        <input id="audio-file" type="file" (change)="onFileSelected($event)" required />
+      </div>
+
+      <div class="buttons">
+        <button mat-raised-button color="primary" type="submit" [disabled]="uploading">
+          Upload
+        </button>
+      </div>
+    </form>
+
+    <div class="home-button">
+      <button mat-stroked-button color="accent" routerLink="/">Home</button>
+    </div>
+
+  </mat-card>
+</div>
