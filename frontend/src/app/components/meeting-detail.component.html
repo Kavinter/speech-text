@@ -1,90 +1,196 @@
-<div *ngIf="meeting$ | async as meeting; else loading" class="meeting-detail-container">
-
-  <!-- OVERLAY for processing -->
-  <div class="overlay" *ngIf="processing">
-    <div class="overlay-content">
-      <p>Meeting is currently processing...</p>
-      <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
-    </div>
-  </div>
-
-  <!-- MEETING INFO -->
-  <mat-card class="meeting-card">
-    <mat-card-title class="text-center">{{ meeting.title }}</mat-card-title>
-    <mat-card-subtitle class="text-center">{{ meeting.date | date:'short' }}</mat-card-subtitle>
-
-    <mat-card-content class="text-center">
-      <p><strong>Status:</strong> {{ meeting.status }}</p>
-      <p *ngIf="meeting.duration"><strong>Duration:</strong> {{ meeting.duration | number:'1.0-0' }} s</p>
-    </mat-card-content>
-
-    <mat-card-actions class="card-actions-center">
-      <button mat-raised-button color="primary" (click)="processMeeting(meeting)" 
-              [disabled]="processing || meeting.status === 'completed'">Process Meeting</button>
-      <button mat-stroked-button color="accent" (click)="exportMeeting(meeting, 'txt')">Export Summary (TXT)</button>
-      <button mat-stroked-button color="accent" (click)="exportMeeting(meeting, 'json')">Export JSON</button>
-      <button mat-stroked-button color="accent" (click)="exportMeeting(meeting, 'md')">Export MD</button>
-    </mat-card-actions>
-  </mat-card>
-
-  <!-- TABS -->
-  <mat-tab-group class="meeting-tabs">
-  <!-- 1. Summary / Zapisnik -->
-  <mat-tab label="Zapisnik">
-    <mat-card class="meeting-card">
-      <mat-card-content>
-        <pre *ngIf="meeting.summaries?.length">
-          {{ meeting.summaries[0].executive_summary }}
-          <ng-container *ngFor="let topic of meeting.summaries[0].topics">Topic: {{ topic }}</ng-container>
-          <ng-container *ngFor="let decision of meeting.summaries[0].decisions">Decision: {{ decision }}</ng-container>
-          <ng-container *ngFor="let action of meeting.summaries[0].action_items">Action: {{ action }}</ng-container>
-          <ng-container *ngFor="let disc of meeting.summaries[0].discussions">Discussion: {{ disc }}</ng-container>
-        </pre>
-        <p *ngIf="!meeting.summaries?.length">No summary available.</p>
-      </mat-card-content>
-    </mat-card>
-  </mat-tab>
-
-  <!-- 2. Reconstructed Transcript -->
-  <mat-tab label="Transkript">
-    <mat-card class="meeting-card">
-      <mat-card-content>
-        <pre *ngIf="meeting.transcript && meeting.transcript.reconstructed_text">{{ meeting.transcript.reconstructed_text }}</pre>
-        <p *ngIf="!meeting.transcript?.reconstructed_text">No reconstructed transcript available.</p>
-      </mat-card-content>
-    </mat-card>
-  </mat-tab>
-
-  <!-- 3. Raw Transcript -->
-  <mat-tab label="Raw Transcript">
-    <mat-card class="meeting-card">
-      <mat-card-content>
-        <pre *ngIf="meeting.transcript && meeting.transcript.raw_text">{{ meeting.transcript.raw_text }}</pre>
-        <p *ngIf="!meeting.transcript?.raw_text">No raw transcript available.</p>
-      </mat-card-content>
-    </mat-card>
-  </mat-tab>
-</mat-tab-group>
-
-  <!-- SPEAKERS -->
-  <mat-card class="meeting-card" *ngIf="meeting.speakers && meeting.speakers.length > 0">
-    <mat-card-title class="text-center">Speakers</mat-card-title>
-    <mat-card-content>
-      <div *ngFor="let sp of meeting.speakers" class="speaker-row">
-        <label>{{ sp.label }}:</label>
-        <input [(ngModel)]="sp.name" placeholder="Enter name" />
-      </div>
-    </mat-card-content>
-    <mat-card-actions class="card-actions-center">
-      <button mat-raised-button color="primary" (click)="updateSpeakers(meeting)">Update Speakers</button>
-    </mat-card-actions>
-  </mat-card>
-
+<div class="back-row">
+  <button mat-button (click)="goBack()">
+    <mat-icon>arrow_back</mat-icon> Meetings
+  </button>
 </div>
 
-<ng-template #loading>
-  <div class="loading-container">
-    <p>Loading meeting details...</p>
-    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+@if (meeting$ | async; as meeting) {
+  <!-- PROCESSING OVERLAY -->
+  @if (processing) {
+    <div class="overlay">
+      <div class="overlay-content">
+        <p>Processing meeting audio...</p>
+        <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
+      </div>
+    </div>
+  }
+
+  <div class="meeting-detail-container">
+
+    <!-- HEADER CARD -->
+    <mat-card class="header-card">
+      <mat-card-header>
+        <mat-card-title>{{ meeting.title }}</mat-card-title>
+        <mat-card-subtitle>{{ meeting.date | date:'mediumDate' }}</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="meta-row">
+          <span class="status-badge" [ngClass]="'status-' + meeting.status">{{ meeting.status }}</span>
+          @if (meeting.duration) {
+            <span class="duration-badge">{{ meeting.duration | number:'1.0-0' }}s</span>
+          }
+          @if (meeting.speakers?.length) {
+            <span class="speaker-badge">{{ meeting.speakers!.length }} speakers</span>
+          }
+        </div>
+      </mat-card-content>
+
+      <mat-card-actions>
+        <button mat-raised-button color="primary" (click)="processMeeting(meeting)"
+                [disabled]="processing">
+          Reprocess
+        </button>
+        <button mat-stroked-button color="accent" (click)="showTextInput = !showTextInput"
+                [disabled]="processing">
+          {{ showTextInput ? 'Zatvori' : 'Unesi Transkript' }}
+        </button>
+        <button mat-stroked-button (click)="exportMeeting(meeting, 'txt')">Export TXT</button>
+        <button mat-stroked-button (click)="exportMeeting(meeting, 'json')">Export JSON</button>
+        <button mat-stroked-button (click)="exportMeeting(meeting, 'md')">Export MD</button>
+      </mat-card-actions>
+
+      @if (showTextInput) {
+        <div class="text-input-panel">
+          <p class="text-input-label">Nalepi tekst transkripta — sistem će generisati zapisnik bez audio obrade.</p>
+          <textarea
+            [(ngModel)]="textInput"
+            placeholder="Unesite ili nalepite tekst transkripta ovde..."
+            rows="10"
+            class="transcript-textarea">
+          </textarea>
+          <div class="text-input-actions">
+            <button mat-raised-button color="primary"
+                    [disabled]="!textInput.trim()"
+                    (click)="processFromText(meeting)">
+              Generiši Zapisnik
+            </button>
+          </div>
+        </div>
+      }
+    </mat-card>
+
+    <!-- TABS -->
+    <mat-card class="tabs-card">
+      <mat-tab-group animationDuration="200ms">
+
+        <!-- 1. Zapisnik (Summary) -->
+        <mat-tab label="Zapisnik">
+          <div class="tab-content">
+            @if (meeting.summaries?.length) {
+              @let s = meeting.summaries![0];
+              @if (s.executive_summary) {
+                <div class="summary-section">
+                  <h3>Executive Summary</h3>
+                  <p>{{ s.executive_summary }}</p>
+                </div>
+              }
+              @if (s.topics?.length) {
+                <div class="summary-section">
+                  <h3>Topics</h3>
+                  <ul>
+                    @for (t of s.topics; track t) {
+                      <li>{{ t }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+              @if (s.decisions.length) {
+                <div class="summary-section">
+                  <h3>Decisions</h3>
+                  <ul>
+                    @for (d of s.decisions; track d.decision) {
+                      <li>
+                        {{ d.decision }}
+                        @if (d.rationale) { <span> — {{ d.rationale }}</span> }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+              @if (s.action_items.length) {
+                <div class="summary-section">
+                  <h3>Action Items</h3>
+                  <ul>
+                    @for (a of s.action_items; track a.task) {
+                      <li>
+                        {{ a.task }}
+                        @if (a.deadline) { <span class="action-deadline"> · {{ a.deadline }}</span> }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+              @if (s.discussions.length) {
+                <div class="summary-section">
+                  <h3>Discussions</h3>
+                  <ul>
+                    @for (d of s.discussions; track d.topic) {
+                      <li>
+                        {{ d.topic }}
+                        @if (d.conclusion) { <span> — {{ d.conclusion }}</span> }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            } @else {
+              <p class="empty-msg">No summary available.</p>
+            }
+          </div>
+        </mat-tab>
+
+        <!-- 2. Reconstructed Transcript -->
+        <mat-tab label="Transkript">
+          <div class="tab-content">
+            @let reconText = meeting.transcripts?.[0]?.reconstructed_text;
+            @if (reconText) {
+              <pre class="transcript-text">{{ reconText }}</pre>
+            } @else {
+              <p class="empty-msg">No reconstructed transcript available.</p>
+            }
+          </div>
+        </mat-tab>
+
+        <!-- 3. Raw Transcript -->
+        <mat-tab label="Raw Transcript">
+          <div class="tab-content">
+            @let rawText = meeting.transcripts?.[0]?.raw_text;
+            @if (rawText) {
+              <pre class="transcript-text">{{ rawText }}</pre>
+            } @else {
+              <p class="empty-msg">No raw transcript available.</p>
+            }
+          </div>
+        </mat-tab>
+
+      </mat-tab-group>
+    </mat-card>
+
+    <!-- SPEAKERS -->
+    @if (meeting.speakers && meeting.speakers.length > 0) {
+      <mat-card class="speakers-card">
+        <mat-card-header>
+          <mat-card-title>Speakers</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          @for (sp of meeting.speakers; track sp.label) {
+            <div class="speaker-row">
+              <span class="speaker-label">{{ sp.label }}</span>
+              <input [(ngModel)]="sp.name" placeholder="Enter name" class="speaker-input" />
+            </div>
+          }
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-raised-button color="primary" (click)="updateSpeakers(meeting)">Update Speakers</button>
+        </mat-card-actions>
+      </mat-card>
+    }
+
   </div>
-</ng-template>
+} @else {
+  <div class="loading-container">
+    <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
+    <p>Loading meeting...</p>
+  </div>
+}

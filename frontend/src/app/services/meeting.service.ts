@@ -31,6 +31,10 @@ export class MeetingService {
     return this.http.post<void>(`${this.baseUrl}${id}/process`, {});
   }
 
+  processText(id: number, text: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}${id}/process-text`, { text });
+  }
+
   getStatus(id: number): Observable<{ status: string }> {
     return this.http.get<{ status: string }>(`${this.baseUrl}${id}/status`);
   }

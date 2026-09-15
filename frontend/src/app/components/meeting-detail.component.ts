@@ -1,14 +1,15 @@
 import { Component } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MeetingService } from '../services/meeting.service';
 import { Meeting } from '../models/meeting.model';
-import { NgIf, NgForOf, DatePipe, AsyncPipe, DecimalPipe } from '@angular/common';
+import { NgIf, NgForOf, NgClass, DatePipe, AsyncPipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, switchMap, interval, takeWhile, map } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatIconModule } from '@angular/material/icon';
 
 
 @Component({
@@ -17,27 +18,36 @@ import { MatTabsModule } from '@angular/material/tabs';
   templateUrl: './meeting-detail.component.html',
   styleUrls: ['./meeting-detail.component.scss'],
   imports: [
-    NgIf, 
-    NgForOf, 
-    FormsModule, 
-    DatePipe, 
+    NgIf,
+    NgForOf,
+    NgClass,
+    FormsModule,
+    DatePipe,
     AsyncPipe,
     DecimalPipe,
-    MatCardModule, 
-    MatButtonModule, 
+    MatCardModule,
+    MatButtonModule,
     MatProgressSpinnerModule,
-    MatTabsModule
+    MatTabsModule,
+    MatIconModule
   ]
 })
 export class MeetingDetailComponent {
   meeting$?: Observable<Meeting>;
   processing = false;
+  showTextInput = false;
+  textInput = '';
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private meetingService: MeetingService
   ) {
     this.loadMeeting();
+  }
+
+  goBack(): void {
+    this.router.navigate(['/meetings']);
   }
 
   private loadMeeting() {
@@ -94,6 +104,30 @@ export class MeetingDetailComponent {
       a.download = `meeting_${meeting.id}.${format}`;
       a.click();
       window.URL.revokeObjectURL(url);
+    });
+  }
+
+  processFromText(meeting: Meeting): void {
+    if (!this.textInput.trim()) return;
+    this.processing = true;
+    this.showTextInput = false;
+
+    this.meetingService.processText(meeting.id, this.textInput).subscribe({
+      next: () => {
+        interval(2000).pipe(
+          switchMap(() => this.meetingService.getStatus(meeting.id)),
+          takeWhile(status => status.status !== 'completed' && status.status !== 'failed', true)
+        ).subscribe({
+          next: status => {
+            if (status.status === 'completed' || status.status === 'failed') {
+              this.processing = false;
+              this.meeting$ = this.meetingService.getMeeting(meeting.id);
+            }
+          },
+          error: err => { console.error(err); this.processing = false; }
+        });
+      },
+      error: err => { console.error(err); this.processing = false; }
     });
   }
 

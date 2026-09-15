@@ -3,12 +3,30 @@ export interface Speaker {
   name: string | null;
 }
 
+export interface Decision {
+  decision: string;
+  rationale: string;
+}
+
+export interface ActionItem {
+  task: string;
+  assignee: string;
+  deadline: string;
+}
+
+export interface Discussion {
+  topic: string;
+  context: string;
+  key_arguments: string[];
+  conclusion: string;
+}
+
 export interface Summary {
   executive_summary: string | null;
   topics: string[];
-  decisions: string[];
-  action_items: string[];
-  discussions: string[];
+  decisions: Decision[];
+  action_items: ActionItem[];
+  discussions: Discussion[];
 }
 
 export interface Transcript {
@@ -23,7 +41,7 @@ export interface Meeting {
   status: "pending" | "processing" | "completed" | "failed";
   audio_file_path?: string;
   duration?: number;
-  transcript?: Transcript;
+  transcripts?: Transcript[];
   summaries?: Summary[];
   speakers?: Speaker[];
 }
