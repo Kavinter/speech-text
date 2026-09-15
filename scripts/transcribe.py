@@ -57,7 +57,7 @@ def main():
         print(f"Raw transcript saved to: {raw_output}")
 
     raw_text = "\n".join(segments_text)
-    list(summarizer.reconstruct_transcript(raw_text, terms_dict=summarizer.TERMS_TO_CORRECT, output_file=clean_output))
+    list(summarizer.reconstruct_transcript(raw_text, terms_dict=summarizer.SRBGLISH_TERMS, output_file=clean_output))
     if args.verbose:
         print(f"Clean transcript saved to: {clean_output}")
 

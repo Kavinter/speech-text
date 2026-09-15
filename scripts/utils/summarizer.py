@@ -21,7 +21,8 @@ Tvoj zadatak je da:
 
 LM_API_URL = "http://localhost:1234/v1/chat/completions"
 
-CHAT_MODEL = "google/gemma-3-4b"
+CHAT_MODEL = "meta-llama-3.1-8b-instruct"
+
 
 # Pydantic models for meeting minutes
 class ActionItem(BaseModel):
@@ -29,15 +30,18 @@ class ActionItem(BaseModel):
     assignee: str
     deadline: str
 
+
 class Decision(BaseModel):
     decision: str
     rationale: str
+
 
 class TopicDiscussion(BaseModel):
     topic: str
     context: str
     key_arguments: List[str]
     conclusion: str
+
 
 class MeetingMinutes(BaseModel):
     executive_summary: str
@@ -52,7 +56,8 @@ class MeetingMinutes(BaseModel):
     @classmethod
     def from_json(cls, json_str: str) -> "MeetingMinutes":
         return cls.model_validate_json(json_str)
-    
+
+
 def parse_meeting_minutes(llm_json: str) -> MeetingMinutes:
     try:
         return MeetingMinutes.from_json(llm_json)
@@ -60,19 +65,26 @@ def parse_meeting_minutes(llm_json: str) -> MeetingMinutes:
         print("Invalid meeting minutes JSON.")
         raise
 
+
 def to_latin(text: str) -> str:
     try:
         return translit(text, "sr", reversed=True)
     except Exception:
         return text
 
+
 # Yield chunks of text for processing
 def chunk_text(lines, chunk_size=5):
     for i in range(0, len(lines), chunk_size):
-        yield lines[i:i + chunk_size]
+        yield lines[i : i + chunk_size]
+
 
 # Main function to clean a transcript
-def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] = None, output_file: Optional[Path] = None):
+def reconstruct_transcript(
+    raw_text: str,
+    terms_dict: Optional[Dict[str, str]] = None,
+    output_file: Optional[Path] = None,
+):
     if terms_dict is None:
         terms_dict = {}
 
@@ -100,10 +112,15 @@ def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] =
             "model": CHAT_MODEL,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": dict_instructions + "\nCorrect the following text:\n" + chunk_text_to_send}
+                {
+                    "role": "user",
+                    "content": dict_instructions
+                    + "\nCorrect the following text:\n"
+                    + chunk_text_to_send,
+                },
             ],
             "temperature": 0.0,
-            "max_tokens": 300
+            "max_tokens": 300,
         }
 
         try:
@@ -132,6 +149,7 @@ def reconstruct_transcript(raw_text: str, terms_dict: Optional[Dict[str, str]] =
             if append_mode:
                 with open(output_file, "a", encoding="utf-8") as f:
                     f.write(chunk_text_to_send + "\n")
+
 
 # MAIN BLOCK
 if __name__ == "__main__":

@@ -9,9 +9,9 @@ from faster_whisper import WhisperModel
 from faster_whisper.vad import get_speech_timestamps, VadOptions
 from queue import Queue
 from threading import Thread, Event, Lock
-from dataclasses import dataclass
 from pathlib import Path
-from utils import summarizer, meeting_parser, diarizer
+from scripts.utils import summarizer, meeting_parser, diarizer
+from scripts.utils.transcriber import TranscriptSegment
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -33,18 +33,6 @@ vad_options = VadOptions(
     min_silence_duration_ms=150
 )
 
-# Represents a segment of transcribed audio
-@dataclass
-class TranscriptSegment:
-    start: float
-    end: float
-    text: str
-
-    def format(self) -> str:
-        start_str = time.strftime("%M:%S", time.gmtime(int(self.start)))
-        end_str = time.strftime("%M:%S", time.gmtime(int(self.end)))
-        return f"[{start_str} - {end_str}] {self.text}"
-    
 def safe_print(*args, **kwargs):
     with print_lock:
         print(*args, **kwargs)
@@ -348,7 +336,7 @@ def main():
 
         list(summarizer.reconstruct_transcript(
             raw_text,
-            terms_dict=summarizer.TERMS_TO_CORRECT,
+            terms_dict=summarizer.SRBGLISH_TERMS,
             output_file=cleaned_file
         ))
 
