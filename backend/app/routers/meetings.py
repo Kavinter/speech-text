@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 from pathlib import Path
 import json, os
@@ -9,6 +10,10 @@ from app import models, schemas
 from app.database import get_db, SessionLocal
 from app.services.processing_service import ProcessingService
 from app.services.meeting_parser import MeetingParserService
+
+
+class TranscriptTextInput(BaseModel):
+    text: str
 
 
 router = APIRouter(
@@ -39,7 +44,8 @@ def process_meeting_audio(meeting_id: int, audio_path: str):
             diarization=meeting.diarization,
             num_speakers=meeting.num_speakers,
             model_size="large",
-            device="cpu"
+            device="cpu",
+            generate_summary=False
         )
 
         result = processing_service.process_meeting_audio(
@@ -132,6 +138,7 @@ def replace_speaker_labels(text: str, speakers: list[models.Speaker]) -> str:
 
 @router.post("/", response_model=schemas.MeetingRead)
 async def create_meeting(
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     date: str = Form(...),
     file: UploadFile = File(...),
@@ -139,7 +146,7 @@ async def create_meeting(
     num_speakers: int = Form(-1),
     db: Session = Depends(get_db)
 ):
-    
+
     audio_path = AUDIO_DIR / file.filename
     if not audio_path.exists():
         with open(audio_path, "wb") as f:
@@ -156,6 +163,8 @@ async def create_meeting(
     db.add(meeting)
     db.commit()
     db.refresh(meeting)
+
+    background_tasks.add_task(process_meeting_audio, meeting.id, str(audio_path))
     return meeting
 
 
@@ -167,12 +176,13 @@ def list_meetings(db: Session = Depends(get_db)):
 
 @router.get("/{meeting_id}", response_model=schemas.MeetingRead)
 def get_meeting(meeting_id: int, db: Session = Depends(get_db)):
-    meeting = db.query(models.Meeting).options(joinedload(models.Meeting.speakers)).filter(models.Meeting.id == meeting_id).first()
+    meeting = db.query(models.Meeting).options(
+        joinedload(models.Meeting.speakers),
+        joinedload(models.Meeting.transcripts),
+        joinedload(models.Meeting.summaries)
+    ).filter(models.Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
-    
-    meeting.speakers
-
     return meeting
 
 
@@ -197,6 +207,72 @@ def process_meeting(meeting_id: int, background_tasks: BackgroundTasks, db: Sess
 
     background_tasks.add_task(process_meeting_audio, meeting_id, meeting.audio_file_path)
     return {"detail": "Processing started"}
+
+
+def process_meeting_from_text(meeting_id: int, text: str):
+    db = SessionLocal()
+    try:
+        meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+        if not meeting:
+            return
+
+        meeting.status = "processing"
+        db.commit()
+
+        db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).delete()
+        db.query(models.Summary).filter(models.Summary.meeting_id == meeting_id).delete()
+        db.query(models.Speaker).filter(models.Speaker.meeting_id == meeting_id).delete()
+
+        db_transcript = models.Transcript(
+            meeting_id=meeting_id,
+            raw_text=text,
+            reconstructed_text=text
+        )
+        db.add(db_transcript)
+        db.commit()
+
+        temp_file = OUTPUT_DIR / f"_text_input_{meeting_id}.txt"
+        temp_file.write_text(text, encoding="utf-8")
+
+        minutes = MeetingParserService.generate_from_file(temp_file)
+        temp_file.unlink(missing_ok=True)
+
+        db_summary = models.Summary(
+            meeting_id=meeting_id,
+            executive_summary=minutes.executive_summary,
+            topics_json=json.dumps(minutes.topics),
+            decisions_json=json.dumps([d.model_dump() for d in minutes.decisions]),
+            action_items_json=json.dumps([a.model_dump() for a in minutes.action_items]),
+            discussions_json=json.dumps([d.model_dump() for d in minutes.discussions])
+        )
+        db.add(db_summary)
+
+        meeting.status = "completed"
+        db.commit()
+
+    except Exception as e:
+        print(f"Text processing error: {e}")
+        meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+        if meeting:
+            meeting.status = "failed"
+            db.commit()
+    finally:
+        db.close()
+
+
+@router.post("/{meeting_id}/process-text")
+def process_meeting_text(
+    meeting_id: int,
+    body: TranscriptTextInput,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    background_tasks.add_task(process_meeting_from_text, meeting_id, body.text)
+    return {"detail": "Text processing started"}
 
 
 @router.get("/{meeting_id}/status")

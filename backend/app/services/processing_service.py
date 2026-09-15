@@ -17,7 +17,8 @@ class ProcessingService:
         num_speakers: int = -1,
         cluster_threshold: float = 0.5,
         model_size: str = "large",
-        device: str = "cpu"
+        device: str = "cpu",
+        generate_summary: bool = True
     ):
         self.audio_processor = AudioProcessor()
         self.transcriber = TranscriptionService(
@@ -26,6 +27,7 @@ class ProcessingService:
         )
         self.summarizer = SummarizerService()
         self.meeting_parser = MeetingParserService()
+        self.generate_summary = generate_summary
         self.num_speakers = num_speakers
         self.cluster_threshold = cluster_threshold
         self.diarization_enabled = diarization
@@ -94,17 +96,23 @@ class ProcessingService:
             encoding="utf-8"
         )
 
-        test_text = Path("data/sastanak.txt")
-
-        minutes = MeetingParserService.generate_from_file(test_text)
-
         summary_dict = {
-            "executive_summary": minutes.executive_summary,
-            "topics": minutes.topics,
-            "decisions": [d.model_dump() for d in minutes.decisions],
-            "action_items": [a.model_dump() for a in minutes.action_items],
-            "discussions": [d.model_dump() for d in minutes.discussions],
+            "executive_summary": "",
+            "topics": [],
+            "decisions": [],
+            "action_items": [],
+            "discussions": [],
         }
+
+        if self.generate_summary:
+            minutes = MeetingParserService.generate_from_file(transcript_file)
+            summary_dict = {
+                "executive_summary": minutes.executive_summary,
+                "topics": minutes.topics,
+                "decisions": [d.model_dump() for d in minutes.decisions],
+                "action_items": [a.model_dump() for a in minutes.action_items],
+                "discussions": [d.model_dump() for d in minutes.discussions],
+            }
 
         return {
             "duration": duration,
