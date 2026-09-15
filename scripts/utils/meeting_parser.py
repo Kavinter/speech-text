@@ -86,6 +86,11 @@ def generate_meeting_minutes_from_file(file_path: Path, lm_api_url: str = LM_API
         resp.raise_for_status()
         data = resp.json()
         llm_json = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        # Strip markdown code fences if present (e.g. ```json ... ```)
+        if llm_json.startswith("```"):
+            llm_json = llm_json.split("\n", 1)[-1]
+        if llm_json.endswith("```"):
+            llm_json = llm_json.rsplit("```", 1)[0].strip()
     except requests.exceptions.RequestException as e:
         print(f"Error communicating with LLM: {e}")
         raise
