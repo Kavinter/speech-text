@@ -2,15 +2,14 @@ import { Component } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MeetingService } from '../services/meeting.service';
 import { Meeting } from '../models/meeting.model';
-import { NgIf, NgForOf, NgClass, DatePipe, AsyncPipe, DecimalPipe } from '@angular/common';
+import { NgClass, DatePipe, AsyncPipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Observable, switchMap, interval, takeWhile, map } from 'rxjs';
+import { Observable, switchMap, interval, takeWhile } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatIconModule } from '@angular/material/icon';
-
 
 @Component({
   standalone: true,
@@ -18,8 +17,6 @@ import { MatIconModule } from '@angular/material/icon';
   templateUrl: './meeting-detail.component.html',
   styleUrls: ['./meeting-detail.component.scss'],
   imports: [
-    NgIf,
-    NgForOf,
     NgClass,
     FormsModule,
     DatePipe,
@@ -29,8 +26,8 @@ import { MatIconModule } from '@angular/material/icon';
     MatButtonModule,
     MatProgressSpinnerModule,
     MatTabsModule,
-    MatIconModule
-  ]
+    MatIconModule,
+  ],
 })
 export class MeetingDetailComponent {
   meeting$?: Observable<Meeting>;
@@ -41,7 +38,7 @@ export class MeetingDetailComponent {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private meetingService: MeetingService
+    private meetingService: MeetingService,
   ) {
     this.loadMeeting();
   }
@@ -52,20 +49,11 @@ export class MeetingDetailComponent {
 
   private loadMeeting() {
     this.meeting$ = this.route.paramMap.pipe(
-      switchMap(params => {
+      switchMap((params) => {
         const id = Number(params.get('id'));
         return this.meetingService.getMeeting(id);
-      })
+      }),
     );
-  }
-
-  parseJsonArray(jsonStr?: string | null): string[] {
-    if (!jsonStr) return [];
-    try {
-      return JSON.parse(jsonStr);
-    } catch {
-      return [];
-    }
   }
 
   processMeeting(meeting: Meeting): void {
@@ -73,31 +61,36 @@ export class MeetingDetailComponent {
 
     this.meetingService.processMeeting(meeting.id).subscribe({
       next: () => {
-        interval(2000).pipe(
-          switchMap(() => this.meetingService.getStatus(meeting.id)),
-          takeWhile(status => status.status !== 'completed' && status.status !== 'failed', true)
-        ).subscribe({
-          next: status => {
-            if (status.status === 'completed' || status.status === 'failed') {
+        interval(2000)
+          .pipe(
+            switchMap(() => this.meetingService.getStatus(meeting.id)),
+            takeWhile(
+              (status) => status.status !== 'completed' && status.status !== 'failed',
+              true,
+            ),
+          )
+          .subscribe({
+            next: (status) => {
+              if (status.status === 'completed' || status.status === 'failed') {
+                this.processing = false;
+                this.meeting$ = this.meetingService.getMeeting(meeting.id);
+              }
+            },
+            error: (err) => {
+              console.error(err);
               this.processing = false;
-              this.meeting$ = this.meetingService.getMeeting(meeting.id);
-            }
-          },
-          error: err => {
-            console.error(err);
-            this.processing = false;
-          }
-        });
+            },
+          });
       },
-      error: err => {
+      error: (err) => {
         console.error(err);
         this.processing = false;
-      }
+      },
     });
   }
 
   exportMeeting(meeting: Meeting, format: string): void {
-    this.meetingService.exportMeeting(meeting.id, format).subscribe(blob => {
+    this.meetingService.exportMeeting(meeting.id, format).subscribe((blob) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -114,20 +107,31 @@ export class MeetingDetailComponent {
 
     this.meetingService.processText(meeting.id, this.textInput).subscribe({
       next: () => {
-        interval(2000).pipe(
-          switchMap(() => this.meetingService.getStatus(meeting.id)),
-          takeWhile(status => status.status !== 'completed' && status.status !== 'failed', true)
-        ).subscribe({
-          next: status => {
-            if (status.status === 'completed' || status.status === 'failed') {
+        interval(2000)
+          .pipe(
+            switchMap(() => this.meetingService.getStatus(meeting.id)),
+            takeWhile(
+              (status) => status.status !== 'completed' && status.status !== 'failed',
+              true,
+            ),
+          )
+          .subscribe({
+            next: (status) => {
+              if (status.status === 'completed' || status.status === 'failed') {
+                this.processing = false;
+                this.meeting$ = this.meetingService.getMeeting(meeting.id);
+              }
+            },
+            error: (err) => {
+              console.error(err);
               this.processing = false;
-              this.meeting$ = this.meetingService.getMeeting(meeting.id);
-            }
-          },
-          error: err => { console.error(err); this.processing = false; }
-        });
+            },
+          });
       },
-      error: err => { console.error(err); this.processing = false; }
+      error: (err) => {
+        console.error(err);
+        this.processing = false;
+      },
     });
   }
 
@@ -135,7 +139,7 @@ export class MeetingDetailComponent {
     if (!meeting.speakers) return;
     this.meetingService.updateSpeakers(meeting.id, meeting.speakers).subscribe({
       next: () => alert('Speakers updated'),
-      error: err => console.error(err)
+      error: (err) => console.error(err),
     });
   }
 }
